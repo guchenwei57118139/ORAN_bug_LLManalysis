@@ -181,8 +181,7 @@
                 "kind": { "type": "string", "enum": ["spec", "code"] },
                 "source": { "type": "string" },
                 "location": { "type": "string" },
-                "text": { "type": "string" },
-                "relevance": { "type": "number" }
+                "text": { "type": "string" }
               }
             }
           }
