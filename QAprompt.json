@@ -84,10 +84,23 @@
             "items": { "type": "object", "required": ["name"], 
             "properties": { "name": { "type": "string" }, "mime_type": { "type": "string" } } },
             "minItems": 1
-          }
+          },
+          "spec_slices": {
+            "type": "array",
+            "description": "Pre-computed spec markdown slices for the chosen procedure keyword.",
+            "items": {
+              "type": "object",
+              "required": ["text"],
+              "properties": {
+                "heading": { "type": "string" },
+                "location": { "type": "string" },
+                "text": { "type": "string" }
+              }
+            }
+          }          
         }
       },
-      "llm_prompt_template": "You are SpecIndexer. You will receive a spec table of contents/headings via the API in SPEC_TOC and MUST read it as ground truth.\nFile: \n{{name}} ({{mime_type}})\nFrom BUG_CARD and SPEC_TOC, pick 3–6 most relevant sections (procedures, timers, message definitions) by listing some keywords. Also, list the related headings to the TITlE. Return JSON per output_schema.",
+      "llm_prompt_template": "You are SpecIndexer.\n\nInputs you will receive:\n1. BUG_CARD: A structured description of the bug, including procedure_guess, key_ids, interface_guess, signals_or_timers, and a summary of the issue.\n2. SPEC_TOC: Metadata describing the spec file(s). Use it only for identifying which spec the slices belong to.\n3. SPEC_SLICES: One or more markdown text snippets extracted directly from the real specification for the selected procedure keyword. SPEC_SLICES contain the actual spec truth. You must prioritize SPEC_SLICES over SPEC_TOC.\n\nYour job:\nGiven BUG_CARD + SPEC_SLICES, identify the 3–6 most relevant specification sections governing the bug. These sections may relate to: Procedures (e.g., UE Context Modification / Setup / Release), message structures, ID consistency behavior (CU-UE-ID, DU-UE-ID), error handling or abnormal cases, expected state transitions and constraints.\n\nFor each section, produce:\n- \"Keywords\": Short strings used for searching source code (e.g., procedure names, message names, IE names, identifier fields, timers, error types).\n- \"title\": An array of strings representing the section\u2019s conceptual heading (split into tokens, e.g., [\"5.4.1\", \"UE CONTEXT MODIFICATION\"]).\n\nAdditionally:\nSummarize \"expected_behaviour\": a concise description of what the spec states should happen in normal operation and in abnormal scenarios related to the bug (e.g., ID mismatch handling, validation, state machine constraints).\n\nImportant rules:\n- SPEC_SLICES contain the ground-truth specification text. Do not hallucinate spec content not present there.\n- From BUG_CARD, infer which procedures or identifiers are relevant, and match them to the provided SPEC_SLICES text.\n- Ensure all output strictly conforms to output_schema.\n\nProduce only valid JSON. No commentary or explanation.",
       "output_schema": {
         "type": "object",
         "required": ["candidate_spec_sections","expected_behaviour"],

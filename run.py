@@ -8,6 +8,8 @@ from copy import deepcopy
 from jsonschema import Draft202012Validator, ValidationError
 from copy import deepcopy
 
+import subprocess
+
 # ---------- util func ----------
 
 def build_global_defs(spec: dict) -> dict:
@@ -93,6 +95,23 @@ def llm_call(client, model, step_obj, inputs: dict, attachments_paths=None, temp
     )
     return resp.text
 
+SPEC_DOCX_PATH = os.path.join(os.path.dirname(__file__), "38473-h20.docx")
+
+def run_spec_ingestor_simple(docx_path: str, keyword: str,
+                             start: str = None,
+                             end: str = None) -> str:
+    """
+    调用 spec_ingestor.py，返回给定 keyword 的 Markdown 上下文。
+    """
+    cmd = ["python", "spec_ingestor.py", docx_path, keyword]
+    if start:
+        cmd += ["--start", start]
+    if end:
+        cmd += ["--end", end]
+
+    out = subprocess.check_output(cmd, text=True)
+    return out  # markdown string
+
 def validate_json(schema, data_text):
     data = json.loads(data_text)
     Draft202012Validator(schema).validate(data)
@@ -112,12 +131,35 @@ def build_inputs_for_step(spec, ctx, step_idx, externals):
     if step_idx == 1:  # step 2: Spec Section Fetcher
         if "step1" not in ctx:
             raise RuntimeError("step2 depends on step1's bug_card")
+
+        bug_card = ctx["step1"]["bug_card"]
+
+        # 1) 从 bug_card 中取 keyword（procedure_guess）
+        proc_guess = bug_card.get("procedure_guess", [])
+        if not isinstance(proc_guess, list) or not proc_guess:
+            raise RuntimeError(
+                "step2: bug_card.procedure_guess is empty; "
+                "cannot call spec_ingestor without a keyword."
+            )
+        kw = str(proc_guess[0]) 
+        spec_toc = externals.get("spec_toc", [
+            {"name": "3GPP TS 38.473 (F1AP)", "mime_type": "text/markdown"}
+        ])
+
+        md = run_spec_ingestor_simple(SPEC_DOCX_PATH, kw)  # 调用 spec_ingestor
+
+        spec_slices = [{
+            "heading": f"Context for {kw}",
+            "location": "auto",
+            "text": md,
+        }]
+
         return {
-            "bug_card": ctx["step1"]["bug_card"],
-            "spec_toc": externals.get("spec_toc", [
-                {"name": "3GPP TS 38.473 (F1AP)", "mime_type": "text/markdown"}
-            ])
+            "bug_card": bug_card,
+            "spec_toc": spec_toc,
+            "spec_slices": spec_slices,
         }
+
 
     if step_idx == 2:  # step 3: Code Fetcher
         if "step1" not in ctx or "step2" not in ctx:
