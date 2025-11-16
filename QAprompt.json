@@ -1,0 +1,324 @@
+{
+  "workflow_name": "OAI RAN Bug Root-Cause (Spec vs Implementation)",
+  "global_rules": {
+    "output_must_be_json_only": true,
+    "language": "English",
+    "cite_with_locations": true,
+    "no_freeform_prose": true,
+    "pass_through_context_keys": ["bug_card", "candidate_spec_sections", "candidate_code", "snippets", "sketch", "invariant_checks", "evidence_pack", "report"]
+  },
+  "$defs": {
+    "RepoEnum": {
+      "type": "string",
+      "enum": ["https://gitlab.eurecom.fr/oai/openairinterface5g/-/tree/develop/openair2/F1AP?ref_type=heads"]
+    },
+    "InterfaceEnum": {
+      "type": "string",
+      "enum": ["F1AP","E1AP","NGAP","XnAP","RRC","PDCP","RLC","MAC","GTP-U","SCTP"]
+    },
+    "VerdictEnum": {
+      "type": "string",
+      "enum": ["spec-nonconformance", "implementation-bug", "ambiguous", "needs-more-data"]
+    },
+    "ComponentEnum": {
+      "type": "string",
+      "enum": ["gNB-CU", "gNB-DU", "UE", "AMF", "UPF"]
+    }
+  },
+  "steps": [
+    {
+      "step": "step 1",
+      "object": "Bug Ingest",
+      "goal": "Normalize a freeform bug report into a structured bug card with interface/procedure guesses and key identifiers.",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_text"],
+        "properties": {
+          "bug_text": { "type": "string", "description": "3–6 sentence behavior description" }
+        }
+      },
+      "llm_prompt_template": "You are BugCardBuilder. Extract and normalize from BUG_TEXT: likely interface(s), procedure(s), component roles, and key IDs (transaction IDs, CU/DU UE F1AP IDs, DU ID, RNTI, PCI, served-cell list). Summarize observed vs expected (if implied). Return JSON only conforming to output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["bug_card"],
+        "properties": {
+          "bug_card": {
+            "type": "object",
+            "required": ["observed_behavior", "interface_guess", "procedure_guess", "components_involved"],
+            "properties": {
+              "observed_behavior": { "type": "string" },
+              "interface_guess": { "type": "array", "items": {"$ref":"#/$defs/InterfaceEnum" } },
+              "procedure_guess": { "type": "array", "items": { "type": "string" } },
+              "components_involved": { "type": "array", "items": {"$ref":"#/$defs/ComponentEnum" },"minItems":1 },
+              "key_ids": {
+                "type": "object",
+                "properties": {
+                  "transaction_id": { "type": "string" },
+                  "cu_ue_f1ap_id": { "type": "string" },
+                  "du_ue_f1ap_id": { "type": "string" },
+                  "du_id": { "type": "string" },
+                  "rnti": { "type": "string" },
+                  "pci": { "type": "string" },
+                  "served_cell_list": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "signals_or_timers": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      },
+      "validation_rules": ["All fields present per output_schema", "interface_guess/procedure_guess not empty", "No prose outside JSON"]
+    },
+    {
+      "step": "step 2",
+      "object": "Spec Section Fetcher",
+      "goal": "Propose spec sections (procedures, timers, message formats) that likely govern the bug.",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_card", "spec_toc"],
+        "properties": {
+          "bug_card": { "$ref": "#/steps/0/output_schema/properties/bug_card" },
+          "spec_toc": {
+            "type": "array",
+            "description": "Table of contents with ids/titles/anchors",
+            "items": { "type": "object", "required": ["name"], 
+            "properties": { "name": { "type": "string" }, "mime_type": { "type": "string" } } },
+            "minItems": 1
+          }
+        }
+      },
+      "llm_prompt_template": "You are SpecIndexer. You will receive a spec table of contents/headings via the API in SPEC_TOC and MUST read it as ground truth.\nFile: \n{{name}} ({{mime_type}})\nFrom BUG_CARD and SPEC_TOC, pick 3–6 most relevant sections (procedures, timers, message definitions) by listing some keywords. Also, list the related headings to the TITlE. Return JSON per output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["candidate_spec_sections","expected_behaviour"],
+        "properties": {
+          "candidate_spec_sections": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "required": ["Keywords", "title"],
+              "properties": { "Keywords": { "type": "array" }, "title": { "type": "array" } }
+            }
+          },
+          "expected_behaviour": {"type": "string"}
+        }
+      }
+    },
+    {
+      "step": "step 3",
+      "object": "Code Fetcher (metadata-driven)",
+      "goal": "Select likely source files/functions using metadata (paths, interface names, keywords, ASN.1 types, timers).",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_card", "candidate_spec_sections", "repo_metadata"],
+        "properties": {
+          "bug_card": { "$ref": "#/steps/0/output_schema/properties/bug_card" },
+          "candidate_spec_sections": { "$ref": "#/steps/1/output_schema/properties/candidate_spec_sections" },
+          "repo_metadata": {
+            "type": "object",
+            "properties": {
+              "path": { "$ref": "#/$defs/RepoEnum" },
+              "interface_names": {  "$ref": "#/steps/0/output_schema/properties/bug_card/properties/interface_guess" },
+              "known_keywords": { "type": "array", "$ref": "#/steps/2/output_schema/properties/candidate_spec_sections/properties/Keywords" }
+            }
+          }
+        }
+      },
+      "llm_prompt_template": "You are CodeLocator. Build a prioritized list of files/functions to fetch. Use interface names, procedure/timer, keywords. Plan recursion if initial fetch seems insufficient. Return JSON per output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["candidate_code"],
+        "properties": {
+          "candidate_code": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "function_name", "reason"],
+              "properties": { "path": { "type": "string" }, "function_name": { "type": "string" }, "reason": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "step 4",
+      "object": "Lightweight Retriever",
+      "goal": "Retrieve high-signal snippets only from shortlisted specs and code.",
+      "input_schema": {
+        "type": "object",
+        "required": ["candidate_spec_sections", "candidate_code"],
+        "properties": {
+          "candidate_spec_sections": { "$ref": "#/steps/1/output_schema/properties/candidate_spec_sections" },
+          "candidate_code": { "$ref": "#/steps/2/output_schema/properties/candidate_code" }
+        }
+      },
+      "llm_prompt_template": "You are SnippetRetriever. For each query, return top snippets with exact locations (spec id/anchor, file:line-range). Keep each snippet ≤ 120 words. Return JSON per output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["snippets"],
+        "properties": {
+          "snippets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source", "location", "text", "kind"],
+              "properties": {
+                "kind": { "type": "string", "enum": ["spec", "code"] },
+                "source": { "type": "string" },
+                "location": { "type": "string" },
+                "text": { "type": "string" },
+                "relevance": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "step 5",
+      "object": "Event/State Sketcher (draft)",
+      "goal": "Draft expected message sequence and 5–8 state sketch from snippets.",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_card", "snippets"],
+        "properties": {
+          "bug_card": { "$ref": "#/steps/0/output_schema/properties/bug_card" },
+          "snippets": { "$ref": "#/steps/3/output_schema/properties/snippets" }
+        }
+      },
+      "llm_prompt_template": "You are SketchMaker. Build (1) an expected message sequence as ordered events with {from,to,message,precond,postcond} and (2) a compact state machine (5–8 states, transitions with guards). Note assumptions and open questions. Return JSON per output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["sequence_diagram", "state_machine", "assumptions", "questions", "review_request"],
+        "properties": {
+          "sequence_diagram": {
+            "type": "array",
+            "items": { "type": "object", "required": ["from", "to", "message"], "properties": { "from": { "type": "string" }, "to": { "type": "string" }, "message": { "type": "string" }, "precond": { "type": "string" }, "postcond": { "type": "string" } } }
+          },
+          "state_machine": {
+            "type": "object",
+            "required": ["states", "transitions"],
+            "properties": {
+              "states": { "type": "array", "items": { "type": "string" }, "minItems": 5, "maxItems": 8 },
+              "transitions": {
+                "type": "array",
+                "items": { "type": "object", "required": ["from", "to", "on"], "properties": { "from": { "type": "string" }, "to": { "type": "string" }, "on": { "type": "string" }, "guard": { "type": "string" } } }
+              }
+            }
+          },
+          "assumptions": { "type": "array", "items": { "type": "string" } },
+          "questions": { "type": "array", "items": { "type": "string" } },
+          "review_request": { "type": "string", "enum": ["HumanInLoop_B_required"] }
+        }
+      }
+    },
+    {
+      "step": "step 6",
+      "object": "Conformance Checker (simple invariants)",
+      "goal": "Check core invariants to propose preliminary verdict.",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_card", "sequence_diagram", "state_machine", "snippets"],
+        "properties": {
+          "bug_card": { "$ref": "#/steps/0/output_schema/properties/bug_card" },
+          "sequence_diagram": { "$ref": "#/steps/4/output_schema/properties/sequence_diagram" },
+          "state_machine": { "$ref": "#/steps/4/output_schema/properties/state_machine" },
+          "snippets": { "$ref": "#/steps/3/output_schema/properties/snippets" }
+        }
+      },
+      "llm_prompt_template": "You are ConformanceChecker. Using SNIPPETS as authority, test invariants: directionality, req/resp pairing, ID binding (e.g., CU/DU UE F1AP ID), transaction scoping, no-pending-request on new request, timer preconditions. For each invariant: PASS/FAIL with cite. Propose preliminary verdict per output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["invariant_checks", "preliminary_verdict", "rationale"],
+        "properties": {
+          "invariant_checks": {
+            "type": "array",
+            "items": { "type": "object", "required": ["name", "result", "evidence"], "properties": { "name": { "type": "string" }, "result": { "type": "string", "enum": ["PASS", "FAIL", "UNKNOWN"] }, "evidence": { "type": "array", "items": { "type": "string" } } } }
+          },
+          "preliminary_verdict": { "type": "string", "enum": ["spec-nonconformance", "implementation-bug", "ambiguous", "needs-more-data"] },
+          "rationale": { "type": "string" }
+        }
+      }
+    },
+    {
+      "step": "step 7",
+      "object": "Evidence Linker",
+      "goal": "Bundle a compact evidence pack linking spec clauses and code lines with an expected-vs-observed chain.",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_card", "invariant_checks", "snippets"],
+        "properties": {
+          "bug_card": { "$ref": "#/steps/0/output_schema/properties/bug_card" },
+          "invariant_checks": { "$ref": "#/steps/5/output_schema/properties/invariant_checks" },
+          "snippets": { "$ref": "#/steps/3/output_schema/properties/snippets" }
+        }
+      },
+      "llm_prompt_template": "You are EvidenceBundler. Assemble a minimal yet complete pack: spec refs (id/anchor), code refs (file:lines), and a single paragraph contrasting expected vs observed. Return JSON per output_schema.",
+      "output_schema": {
+        "type": "object",
+        "required": ["evidence_pack"],
+        "properties": {
+          "evidence_pack": {
+            "type": "object",
+            "required": ["spec_citations", "code_citations", "expected_vs_observed"],
+            "properties": {
+              "spec_citations": { "type": "array", "items": { "type": "string" } },
+              "code_citations": { "type": "array", "items": { "type": "string" } },
+              "expected_vs_observed": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "step 8",
+      "object": "Report Generator",
+      "goal": "Emit a one-page final report and request human sign-off on verdict.",
+      "input_schema": {
+        "type": "object",
+        "required": ["bug_card", "invariant_checks", "evidence_pack"],
+        "properties": {
+          "bug_card": { "$ref": "#/steps/0/output_schema/properties/bug_card" },
+          "invariant_checks": { "$ref": "#/steps/5/output_schema/properties/invariant_checks" },
+          "evidence_pack": { "$ref": "#/steps/6/output_schema/properties/evidence_pack" }
+        }
+      },
+      "llm_prompt_template": "You are ReportWriter. Produce the final JSON report with {verdict, rationale, citations, suggested_repro, risks, next_steps}. Be concise and actionable.",
+      "output_schema": {
+        "type": "object",
+        "required": ["report", "review_request"],
+        "properties": {
+          "report": {
+            "type": "object",
+            "required": ["verdict", "rationale", "citations", "suggested_repro", "next_steps"],
+            "properties": {
+              "verdict": { "type": "string", "$ref": "#/$defs/VerdictEnum" },
+              "rationale": { "type": "string" },
+              "citations": {
+                "type": "object",
+                "properties": {
+                  "spec": { "type": "array", "items": { "type": "string" } },
+                  "code": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "suggested_repro": { "type": "array", "items": { "type": "string" } },
+              "risks": { "type": "array", "items": { "type": "string" } },
+              "next_steps": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "review_request": { "type": "string", "enum": ["HumanInLoop_C_required"] }
+        }
+      }
+    }
+  ],
+  "example_invocation": {
+    "step": "step 1",
+    "input": {
+      "bug_text": "After UE release, DU immediately sends DL RRC Message Transfer; CU hangs and new F1 Setup Requests with mutated DU-Served-Cell-List cause CU to stall. Logs show missing response to UE Context Modification. Happens on OAI develop branch.",
+      "repo": "OAI",
+      "optional_context": { "logs": ["..."], "version": "commit abc123", "env": "Ubuntu 22.04" }
+    }
+  }
+}
