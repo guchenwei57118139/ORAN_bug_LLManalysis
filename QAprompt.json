@@ -99,7 +99,7 @@
             "items": {
               "type": "object",
               "required": ["Keywords", "title"],
-              "properties": { "Keywords": { "type": "array" }, "title": { "type": "array" } }
+              "properties": { "Keywords": { "type": "array", "items": { "type": "string" }}, "title": { "type": "array", "items": { "type": "string" }} }
             }
           },
           "expected_behaviour": {"type": "string"}

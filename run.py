@@ -220,7 +220,7 @@ if __name__ == "__main__":
         2) Wait for UE Context Release to remove mapping, then immediately send DL RRC Message Transfer.
         3) CU dereferences stale/NULL mapping and segfaults.
         """}    
-    externals["spec_toc"]={'name':'F1AP.md',"mime_type":'text/markdown'}
+    externals["spec_toc"]=[{'name':'F1AP.md',"mime_type":'text/markdown'}]
     ctx = run_pipeline(
         spec_path='QAprompt.json',
         model="gemini-2.5-flash",
