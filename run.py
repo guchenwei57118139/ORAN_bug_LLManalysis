@@ -215,7 +215,14 @@ def build_inputs_for_step(spec, ctx, step_idx, externals):
             "invariant_checks": ctx["step6"]["invariant_checks"],
             "snippets": ctx["step4"]["snippets"]
         }
-
+    if step_idx==7:
+        if "step1" not in ctx or "step6" not in ctx or "step7" not in ctx:
+            raise RuntimeError("step8 depends on step1.bug_card,step6.invariant_checks and step7.evidence_pack")
+        return {
+            "bug_card": ctx["step1"]["bug_card"],
+            "invariant_checks": ctx["step6"]["invariant_checks"],
+            "evidence_pack": ctx["step7"]["evidence_pack"]
+        }
     raise RuntimeError(f"Unachieved step: {step_idx+1}")
 
 
@@ -228,8 +235,8 @@ def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None,
 
 
     global_defs=spec.get("$defs",{})
-    # step1-7
-    for idx in range(7):
+    # step1-8
+    for idx in range(8):
         step = spec["steps"][idx]
         step_name = step["step"]
         inputs = build_inputs_for_step(spec, ctx, idx, externals)
