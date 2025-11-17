@@ -8,7 +8,7 @@ from copy import deepcopy
 from jsonschema import Draft202012Validator, ValidationError
 from copy import deepcopy
 
-import subprocess
+import subprocess, re
 
 # ---------- util func ----------
 
@@ -97,20 +97,51 @@ def llm_call(client, model, step_obj, inputs: dict, attachments_paths=None, temp
 
 SPEC_DOCX_PATH = os.path.join(os.path.dirname(__file__), "38473-h20.docx")
 
-def run_spec_ingestor_simple(docx_path: str, keyword: str,
-                             start: str = None,
-                             end: str = None) -> str:
+def run_spec_ingestor_simple(docx_path: str, keyword: str) -> str:
     """
     调用 spec_ingestor.py，返回给定 keyword 的 Markdown 上下文。
     """
     cmd = ["python", "spec_ingestor.py", docx_path, keyword]
-    if start:
-        cmd += ["--start", start]
-    if end:
-        cmd += ["--end", end]
-
     out = subprocess.check_output(cmd, text=True)
     return out  # markdown string
+
+def build_spec_toc_from_bug(bug_card):
+    """
+    从 bug_card.procedure_guess 里取出所有 keyword，
+    对每个 keyword 调用 spec_ingestor，生成一个 markdown 文件。
+
+    返回:
+      spec_toc:    [{'name': 'slice_1_xxx.md', 'mime_type': 'text/markdown'}, ...]
+      slice_paths: ['/abs/path/to/slice_1_xxx.md', ...]  # 给附件上传用
+    """
+    proc_guess = bug_card.get("procedure_guess", [])
+    if not isinstance(proc_guess, list) or not proc_guess:
+        raise RuntimeError("step2: bug_card.procedure_guess is empty; cannot build spec slices.")
+
+    out_dir = os.path.join(os.path.dirname(__file__), "spec_slices")
+    os.makedirs(out_dir, exist_ok=True)
+
+    spec_toc = []
+    slice_paths = []
+
+    for i, kw in enumerate(proc_guess, start=1):
+        kw_str = str(kw)
+        # 1) 调 spec_ingestor 拿到 markdown
+        md = run_spec_ingestor_simple(SPEC_DOCX_PATH, kw_str)
+        # 2) 把 keyword 变成安全一点的文件名
+        safe_kw = re.sub(r"[^A-Za-z0-9]+", "_", kw_str).strip("_") or f"kw{i}"
+        file_name = f"slice_{i}_{safe_kw}.md"
+        file_path = os.path.join(out_dir, file_name)
+        # 3) 写入 .md 文件
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(md)
+        # 4) 记录 metadata 和路径
+        slice_paths.append(file_path)
+        spec_toc.append({
+            "name": file_name,
+            "mime_type": "text/markdown",
+        })
+    return spec_toc, slice_paths
 
 def validate_json(schema, data_text):
     data = json.loads(data_text)
@@ -133,31 +164,11 @@ def build_inputs_for_step(spec, ctx, step_idx, externals):
             raise RuntimeError("step2 depends on step1's bug_card")
 
         bug_card = ctx["step1"]["bug_card"]
-
-        # 1) 从 bug_card 中取 keyword（procedure_guess）
-        proc_guess = bug_card.get("procedure_guess", [])
-        if not isinstance(proc_guess, list) or not proc_guess:
-            raise RuntimeError(
-                "step2: bug_card.procedure_guess is empty; "
-                "cannot call spec_ingestor without a keyword."
-            )
-        kw = str(proc_guess[0]) 
-        spec_toc = externals.get("spec_toc", [
-            {"name": "3GPP TS 38.473 (F1AP)", "mime_type": "text/markdown"}
-        ])
-
-        md = run_spec_ingestor_simple(SPEC_DOCX_PATH, kw)  # 调用 spec_ingestor
-
-        spec_slices = [{
-            "heading": f"Context for {kw}",
-            "location": "auto",
-            "text": md,
-        }]
-
+        spec_toc, slice_paths = build_spec_toc_from_bug(bug_card)
+        externals["spec_slice_paths"] = slice_paths
         return {
             "bug_card": bug_card,
             "spec_toc": spec_toc,
-            "spec_slices": spec_slices,
         }
 
 
@@ -241,8 +252,10 @@ def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None,
         step_name = step["step"]
         inputs = build_inputs_for_step(spec, ctx, idx, externals)
 
-        # optional: upload some attachment files here (say, step2)
-        attach = attach_files if idx == 1 else None
+        if idx == 1:
+            attach = externals.get("spec_slice_paths", [])
+        else:
+            attach = None
 
         raw = llm_call(client, model, step, inputs, attachments_paths=attach, temperature=temperature,global_defs=global_defs, )
         prepared_schema = inject_defs_into_schema(step["output_schema"], global_defs)
