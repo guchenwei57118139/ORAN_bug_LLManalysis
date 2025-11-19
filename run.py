@@ -9,7 +9,10 @@ from jsonschema import Draft202012Validator, ValidationError
 from copy import deepcopy
 
 import subprocess, re
+#-----------global output file-----------
 
+input_dict=json.load(open('input.json','r'))
+output_data={}
 # ---------- util func ----------
 
 def build_global_defs(spec: dict) -> dict:
@@ -240,7 +243,8 @@ def build_inputs_for_step(spec, ctx, step_idx, externals):
 
 def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None, temperature=0.1):
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    client=genai.Client(api_key="AIzaSyBaqSqxBCfSsomsMGKLNISFvJU_h1Mwom0")
+    #client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     ctx = {}
     global_defs = build_global_defs(spec)
 
@@ -266,101 +270,23 @@ def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None,
             raise SystemExit(f"[SchemaError] step {idx+1} ({step_name}) invalid output: {e.message}\nreturn origin:\n{raw}")
 
         ctx[f"step{idx+1}"] = data
-        print(f"\n=== step {idx+1} ({step_name}) OK ===")
-        print(json.dumps(data, ensure_ascii=False, indent=2))
-        input()
+        output_data[f'step{idx+1}']=data
 
     return ctx
 if __name__ == "__main__":
-    externals={'bug_text': """
-        Title: CU segfault after UE Context Modification Response with mutated DU UE ID
-        Observed:
-        - After UE release, attacker sends a UE Context Modification Response carrying an inconsistent {CU-UE-ID, DU-UE-ID} pair.
-        - CU later calls cu_get_f1_ue_data(UE->rrc_ue_id) and crashes (NULL/assert).
-        Repro Steps:
-        1) Intercept legitimate UE Context Modification Request, mutate DU UE F1AP ID / RNTI and forward.
-        2) Wait for UE Context Release to remove mapping, then immediately send DL RRC Message Transfer.
-        3) CU dereferences stale/NULL mapping and segfaults.
-        """}    
-    externals["spec_toc"]=[{'name':'F1AP.md',"mime_type":'text/markdown'}]
-    ctx = run_pipeline(
-        spec_path='QAprompt.json',
-        model="gemini-2.5-flash",
-        externals=externals,
-        attach_files=None,
-        temperature=0.1
-    )
-# # 读取你的工作流 JSON
-# spec = json.loads(Path("QAprompt.json").read_text(encoding="utf-8"))
-# global_defs=spec.get("$defs",{})
-# client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-# for step_id in range(7):
-#     step = spec["steps"][step_id]
-#     output_schema = step["output_schema"]
-#     output_schema["$defs"]=global_defs
-#     text=""
-#     if step_id==0:
-#         text = """
-#         Title: CU segfault after UE Context Modification Response with mutated DU UE ID
-#         Observed:
-#         - After UE release, attacker sends a UE Context Modification Response carrying an inconsistent {CU-UE-ID, DU-UE-ID} pair.
-#         - CU later calls cu_get_f1_ue_data(UE->rrc_ue_id) and crashes (NULL/assert).
-#         Repro Steps:
-#         1) Intercept legitimate UE Context Modification Request, mutate DU UE F1AP ID / RNTI and forward.
-#         2) Wait for UE Context Release to remove mapping, then immediately send DL RRC Message Transfer.
-#         3) CU dereferences stale/NULL mapping and segfaults.
-#         """
-    
-    #     bundle = {
-    #         "workflow_name": spec.get("workflow_name"),
-    #         "rules": spec.get("global_rules", {}),
-    #         "current_step": {
-    #             "name": step["step"],
-    #             "llm_prompt_template": step["llm_prompt_template"],
-    #             "input_schema": step["input_schema"],
-    #             "output_schema": output_schema
-    #         },
-    #         "inputs": {
-    #             "bug_text": text,
-    #             # "repo": "OAI RAN",
-    #             # "optional_context": {
-    #             #     "branch": "develop",
-    #             #     "spec_refs": ["3GPP TS 38.473 F1AP"],
-    #             #     "files_seen": [
-    #             #         "openair2/F1AP/f1ap_ids.c",
-    #             #         "openair2/RRC/NR/rrc_gNB.c",
-    #             #         "openair2/F1AP/f1ap_cu_ue_context_management.c"
-    #             #     ]
-    #             # }
-    #         }
-    #     }
-    # cfg = GenerateContentConfig(
-    #     system_instruction=(
-    #         "You are executing a JSON-only bug-ingest step. "
-    #         "Return JSON only. Never use placeholders. "
-    #         "Even with partial evidence, infer at least ONE item for "
-    #         "interface_guess, procedure_guess, and components_involved, "
-    #         "based on protocol names, function names, and file paths in bug_text."
-    #     ),
-    #     response_mime_type="application/json",
-    #     response_schema=output_schema,
-    #     temperature=0.1,
-    # )
-
-    # resp = client.models.generate_content(
-    #     model="gemini-2.5-flash",
-    #     config=cfg,
-    #     contents=[{
-    #         "role": "user",
-    #         "parts": [{
-    #             "text": (
-    #                 "Execute the current step using the bundle below. "
-    #                 "Return JSON matching output_schema exactly.\n\n"
-    #                 + json.dumps(bundle, ensure_ascii=False)
-    #             )
-    #         }]
-    #     }],
-    # )
-
-    # print(resp.text)            
-    # input()
+    for bug,values in input_dict.items():
+        if bug=='bug1' or bug=='bug2' or bug=='bug3' or bug=='bug4' or bug=='bug5':continue
+        bug_text=values['input']
+        output_data={}
+        fw=open(values['output'],'w')
+        externals={'bug_text':bug_text}    
+       # externals["spec_toc"]=[{'name':'F1AP.md',"mime_type":'text/markdown'}]
+        ctx = run_pipeline(
+            spec_path='QAprompt.json',
+            model="gemini-2.5-flash",
+            externals=externals,
+            attach_files=None,
+            temperature=0.1
+        )
+        print(f"========={bug} report OK=========")
+        json.dump(output_data,fw,indent=2)
