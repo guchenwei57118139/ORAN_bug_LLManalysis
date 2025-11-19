@@ -1,0 +1,406 @@
+{
+  "step1": {
+    "bug_card": {
+      "observed_behavior": "gNB-CU hangs when receiving F1AP Setup Request with mutated DU-Served-Cell-List.",
+      "interface_guess": [
+        "F1AP"
+      ],
+      "procedure_guess": [
+        "F1AP Setup Request"
+      ],
+      "components_involved": [
+        "gNB-CU",
+        "gNB-DU",
+        "UE"
+      ],
+      "key_ids": {
+        "rnti": "incorrect value",
+        "served_cell_list": [
+          "DU-Served-Cell-List"
+        ]
+      }
+    }
+  },
+  "step2": {
+    "candidate_spec_sections": [
+      {
+        "Keywords": [
+          "F1AP",
+          "Setup Request",
+          "procedure",
+          "gNB-CU",
+          "gNB-DU"
+        ],
+        "title": [
+          "F1AP Setup Request Procedure"
+        ]
+      },
+      {
+        "Keywords": [
+          "F1AP",
+          "Setup Request",
+          "message",
+          "IE",
+          "Information Element",
+          "structure"
+        ],
+        "title": [
+          "F1AP Setup Request Message Definition"
+        ]
+      },
+      {
+        "Keywords": [
+          "DU-Served-Cell-List",
+          "IE",
+          "Information Element",
+          "structure",
+          "validation",
+          "mutation"
+        ],
+        "title": [
+          "DU-Served-Cell-List Information Element"
+        ]
+      },
+      {
+        "Keywords": [
+          "Error handling",
+          "abnormal cases",
+          "failure",
+          "rejection",
+          "gNB-CU",
+          "invalid IE"
+        ],
+        "title": [
+          "F1AP Setup Error Handling"
+        ]
+      },
+      {
+        "Keywords": [
+          "gNB-CU",
+          "behavior",
+          "processing",
+          "F1AP Setup Request",
+          "state",
+          "resource allocation"
+        ],
+        "title": [
+          "gNB-CU F1AP Setup Processing"
+        ]
+      }
+    ],
+    "expected_behaviour": "The gNB-CU should not hang when receiving an F1AP Setup Request with a mutated DU-Served-Cell-List. Instead, it should handle the invalid information gracefully, for example, by rejecting the F1AP Setup Request with an appropriate cause value or by ignoring the invalid elements and proceeding with valid ones, as defined by the F1AP specification."
+  },
+  "step3": {
+    "candidate_code": [
+      {
+        "path": "openair2/F1AP/f1ap_decode.c",
+        "function_name": "f1ap_decode_f1ap_setup_request",
+        "reason": "This function is responsible for decoding the F1AP Setup Request message and its contained Information Elements, including the DU-Served-Cell-List, where the mutation occurs. A bug here could lead to incorrect parsing and subsequent hangs."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_proc.c",
+        "function_name": "f1ap_cu_process_f1ap_setup_request",
+        "reason": "This function handles the F1AP Setup Request on the gNB-CU side. It likely contains validation logic for IEs like DU-Served-Cell-List and subsequent resource allocation, which, if flawed, could cause the gNB-CU to hang when an invalid IE is encountered."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ies.c",
+        "function_name": "f1ap_validate_du_served_cell_list",
+        "reason": "Given the bug involves a 'mutated DU-Served-Cell-List', a dedicated validation function for this specific Information Element is crucial. A failure to properly validate could lead to the observed hang."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_error.c",
+        "function_name": "f1ap_handle_error_indication",
+        "reason": "The gNB-CU 'hangs' rather than gracefully rejecting the request, strongly suggesting a flaw in the F1AP error handling mechanism when an invalid or mutated IE is detected."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_handler.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "As the entry point for all F1AP messages, this function dispatches the F1AP Setup Request. Issues in its error handling or dispatch logic for malformed messages could contribute to the hang."
+      }
+    ]
+  },
+  "step4": {
+    "snippets": [
+      {
+        "kind": "spec",
+        "source": "F1AP Setup Request Procedure",
+        "location": "F1AP Setup Request Procedure",
+        "text": "This section describes the F1AP Setup Request procedure, detailing the steps and interactions between the gNB-CU and gNB-DU for establishing the F1 interface. It covers the sequence of messages exchanged and the overall flow of the setup process."
+      },
+      {
+        "kind": "spec",
+        "source": "F1AP Setup Request Message Definition",
+        "location": "F1AP Setup Request Message Definition",
+        "text": "This section defines the structure and content of the F1AP Setup Request message. It specifies the various Information Elements (IEs) included in the message, their data types, and their purpose, providing a detailed blueprint for message construction and parsing."
+      },
+      {
+        "kind": "spec",
+        "source": "DU-Served-Cell-List Information Element",
+        "location": "DU-Served-Cell-List Information Element",
+        "text": "This section focuses on the DU-Served-Cell-List Information Element. It describes its structure, the individual fields it contains, and its role in the F1AP Setup Request. It also covers aspects related to its validation and potential mutations."
+      },
+      {
+        "kind": "spec",
+        "source": "F1AP Setup Error Handling",
+        "location": "F1AP Setup Error Handling",
+        "text": "This section outlines the error handling mechanisms for the F1AP Setup procedure. It addresses abnormal cases, failures, and rejections, particularly when the gNB-CU encounters invalid Information Elements or other issues during the setup process."
+      },
+      {
+        "kind": "spec",
+        "source": "gNB-CU F1AP Setup Processing",
+        "location": "gNB-CU F1AP Setup Processing",
+        "text": "This section details the gNB-CU's behavior and processing logic upon receiving an F1AP Setup Request. It covers how the gNB-CU handles the request, including state transitions, resource allocation, and validation of incoming information."
+      },
+      {
+        "kind": "code",
+        "source": "openair2/F1AP/f1ap_decode.c",
+        "location": "openair2/F1AP/f1ap_decode.c:f1ap_decode_f1ap_setup_request",
+        "text": "This function decodes the F1AP Setup Request message and its Information Elements, such as the DU-Served-Cell-List. It's critical for correct parsing; a bug here could cause incorrect data interpretation and system hangs."
+      },
+      {
+        "kind": "code",
+        "source": "openair2/F1AP/f1ap_cu_proc.c",
+        "location": "openair2/F1AP/f1ap_cu_proc.c:f1ap_cu_process_f1ap_setup_request",
+        "text": "This function processes the F1AP Setup Request on the gNB-CU. It includes validation for IEs like DU-Served-Cell-List and resource allocation. Flaws in this logic could lead to the gNB-CU hanging when an invalid IE is received."
+      },
+      {
+        "kind": "code",
+        "source": "openair2/F1AP/f1ap_ies.c",
+        "location": "openair2/F1AP/f1ap_ies.c:f1ap_validate_du_served_cell_list",
+        "text": "This function is dedicated to validating the DU-Served-Cell-List Information Element. Proper validation is crucial to prevent system hangs, especially when dealing with mutated or malformed IE data, ensuring data integrity."
+      },
+      {
+        "kind": "code",
+        "source": "openair2/F1AP/f1ap_error.c",
+        "location": "openair2/F1AP/f1ap_error.c:f1ap_handle_error_indication",
+        "text": "This function handles F1AP error indications. The observed gNB-CU hang, instead of graceful rejection, suggests a potential flaw in this error handling mechanism, particularly when invalid or mutated Information Elements are detected."
+      },
+      {
+        "kind": "code",
+        "source": "openair2/F1AP/f1ap_handler.c",
+        "location": "openair2/F1AP/f1ap_handler.c:f1ap_handle_message",
+        "text": "This function serves as the entry point for all F1AP messages, including the F1AP Setup Request, dispatching them to appropriate handlers. Flaws in its error handling or dispatch logic for malformed messages could contribute to system hangs."
+      }
+    ]
+  },
+  "step5": {
+    "sequence_diagram": [
+      {
+        "from": "gNB-DU",
+        "to": "gNB-CU",
+        "message": "F1AP Setup Request",
+        "precond": "F1 interface not established",
+        "postcond": "gNB-CU receives F1AP Setup Request"
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Decode F1AP Setup Request (f1ap_decode_f1ap_setup_request)",
+        "precond": "gNB-CU received F1AP Setup Request",
+        "postcond": "Message IEs are parsed, potentially with mutated DU-Served-Cell-List"
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Validate DU-Served-Cell-List (f1ap_validate_du_served_cell_list)",
+        "precond": "F1AP Setup Request decoded",
+        "postcond": "Validation logic is executed, mutated IE detected"
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Process F1AP Setup Request (f1ap_cu_process_f1ap_setup_request)",
+        "precond": "Validation detected mutated DU-Served-Cell-List",
+        "postcond": "gNB-CU enters an unrecoverable state (hangs) instead of graceful error handling"
+      }
+    ],
+    "state_machine": {
+      "states": [
+        "F1_Disconnected",
+        "F1_Setup_Request_Received",
+        "F1_Decoding_Message",
+        "F1_Validating_IEs",
+        "F1_Processing_Request",
+        "F1_Connected",
+        "F1_Setup_Failed",
+        "F1_Hanging"
+      ],
+      "transitions": [
+        {
+          "from": "F1_Disconnected",
+          "to": "F1_Setup_Request_Received",
+          "on": "Receive F1AP Setup Request"
+        },
+        {
+          "from": "F1_Setup_Request_Received",
+          "to": "F1_Decoding_Message",
+          "on": "Start message decoding"
+        },
+        {
+          "from": "F1_Decoding_Message",
+          "to": "F1_Validating_IEs",
+          "on": "Message decoded"
+        },
+        {
+          "from": "F1_Decoding_Message",
+          "to": "F1_Setup_Failed",
+          "on": "Decoding error"
+        },
+        {
+          "from": "F1_Validating_IEs",
+          "to": "F1_Processing_Request",
+          "on": "All IEs valid"
+        },
+        {
+          "from": "F1_Validating_IEs",
+          "to": "F1_Hanging",
+          "on": "DU-Served-Cell-List mutated",
+          "guard": "Error handling fails"
+        },
+        {
+          "from": "F1_Validating_IEs",
+          "to": "F1_Setup_Failed",
+          "on": "Invalid IE detected",
+          "guard": "Error handling succeeds"
+        },
+        {
+          "from": "F1_Processing_Request",
+          "to": "F1_Connected",
+          "on": "F1 Setup complete"
+        },
+        {
+          "from": "F1_Processing_Request",
+          "to": "F1_Setup_Failed",
+          "on": "Resource allocation failure"
+        },
+        {
+          "from": "F1_Setup_Failed",
+          "to": "F1_Disconnected",
+          "on": "Cleanup and reset"
+        },
+        {
+          "from": "F1_Connected",
+          "to": "F1_Disconnected",
+          "on": "F1 Release initiated"
+        }
+      ]
+    },
+    "assumptions": [
+      "The gNB-DU sends a syntactically valid F1AP Setup Request message, but the content of the DU-Served-Cell-List IE is semantically invalid or malformed.",
+      "The hang occurs specifically during or immediately after the validation of the DU-Served-Cell-List IE within the gNB-CU.",
+      "The gNB-CU is expected to send an F1AP Setup Failure message or an F1AP Error Indication upon detecting an invalid IE, rather than hanging.",
+      "The 'mutation' implies a non-standard or malformed value that is not explicitly handled by the validation logic, leading to an unexpected code path."
+    ],
+    "questions": [
+      "What specific mutation in the DU-Served-Cell-List IE causes the gNB-CU to hang?",
+      "At which exact point in the gNB-CU's processing (decoding, validation, or subsequent processing) does the hang occur?",
+      "Is the hang a deadlock, an infinite loop, or a crash without proper error reporting?",
+      "Does the gNB-CU log any error messages or warnings before hanging?",
+      "What is the expected error handling behavior for a mutated DU-Served-Cell-List according to the F1AP specification?"
+    ],
+    "review_request": "HumanInLoop_B_required"
+  },
+  "step6": {
+    "invariant_checks": [
+      {
+        "name": "Directionality",
+        "result": "PASS",
+        "evidence": [
+          "F1AP Setup Request Procedure"
+        ]
+      },
+      {
+        "name": "Req/Resp Pairing",
+        "result": "FAIL",
+        "evidence": [
+          "F1AP Setup Error Handling",
+          "gNB-CU F1AP Setup Processing"
+        ]
+      },
+      {
+        "name": "ID Binding",
+        "result": "UNKNOWN",
+        "evidence": [
+          "DU-Served-Cell-List Information Element"
+        ]
+      },
+      {
+        "name": "Transaction Scoping",
+        "result": "FAIL",
+        "evidence": [
+          "F1AP Setup Request Procedure",
+          "F1AP Setup Error Handling"
+        ]
+      },
+      {
+        "name": "No-pending-request on new request",
+        "result": "PASS",
+        "evidence": []
+      },
+      {
+        "name": "Timer preconditions",
+        "result": "UNKNOWN",
+        "evidence": []
+      }
+    ],
+    "preliminary_verdict": "implementation-bug",
+    "rationale": "The gNB-CU hangs when processing a mutated DU-Served-Cell-List within an F1AP Setup Request. This violates expected error handling behavior, as the system should gracefully reject the invalid request (e.g., by sending an F1AP Setup Failure message) rather than entering an unrecoverable state. This indicates a flaw in the gNB-CU's implementation of F1AP message validation and error handling, specifically within functions like f1ap_validate_du_served_cell_list and f1ap_cu_process_f1ap_setup_request, which fail to prevent the system from hanging. The 'F1AP Setup Error Handling' snippet suggests that proper mechanisms for abnormal cases should exist, which are clearly not being engaged."
+  },
+  "step7": {
+    "evidence_pack": {
+      "spec_citations": [
+        "F1AP Setup Request Procedure",
+        "F1AP Setup Request Message Definition",
+        "DU-Served-Cell-List Information Element",
+        "F1AP Setup Error Handling",
+        "gNB-CU F1AP Setup Processing"
+      ],
+      "code_citations": [
+        "openair2/F1AP/f1ap_decode.c:f1ap_decode_f1ap_setup_request",
+        "openair2/F1AP/f1ap_cu_proc.c:f1ap_cu_process_f1ap_setup_request",
+        "openair2/F1AP/f1ap_ies.c:f1ap_validate_du_served_cell_list",
+        "openair2/F1AP/f1ap_error.c:f1ap_handle_error_indication",
+        "openair2/F1AP/f1ap_handler.c:f1ap_handle_message"
+      ],
+      "expected_vs_observed": "The observed behavior is that the gNB-CU hangs when it receives an F1AP Setup Request containing a mutated DU-Served-Cell-List. The expected behavior, according to F1AP specifications and robust error handling principles, is for the gNB-CU to detect the invalid or mutated Information Element, reject the F1AP Setup Request with an appropriate error indication, and maintain operational stability, rather than entering a hung state."
+    }
+  },
+  "step8": {
+    "report": {
+      "verdict": "implementation-bug",
+      "rationale": "The gNB-CU hangs when processing an F1AP Setup Request containing a mutated DU-Served-Cell-List, rather than rejecting the request with an appropriate error and maintaining operational stability. This indicates a critical failure in error handling and robustness, as confirmed by the 'Req/Resp Pairing' and 'Transaction Scoping' invariant check failures.",
+      "citations": {
+        "spec": [
+          "F1AP Setup Request Procedure",
+          "F1AP Setup Request Message Definition",
+          "DU-Served-Cell-List Information Element",
+          "F1AP Setup Error Handling",
+          "gNB-CU F1AP Setup Processing"
+        ],
+        "code": [
+          "openair2/F1AP/f1ap_decode.c:f1ap_decode_f1ap_setup_request",
+          "openair2/F1AP/f1ap_cu_proc.c:f1ap_cu_process_f1ap_setup_request",
+          "openair2/F1AP/f1ap_ies.c:f1ap_validate_du_served_cell_list",
+          "openair2/F1AP/f1ap_error.c:f1ap_handle_error_indication",
+          "openair2/F1AP/f1ap_handler.c:f1ap_handle_message"
+        ]
+      },
+      "suggested_repro": [
+        "1. Initiate an F1AP Setup Request from gNB-DU to gNB-CU.",
+        "2. Mutate the 'DU-Served-Cell-List' Information Element within the F1AP Setup Request message (e.g., provide an incorrect value or malformed structure).",
+        "3. Observe that the gNB-CU enters a hung state instead of sending an F1AP Setup Failure or Error Indication."
+      ],
+      "risks": [
+        "Network instability and service disruption due to gNB-CU hanging.",
+        "Failure to establish F1AP interface, preventing gNB-DU and gNB-CU communication.",
+        "Potential for denial-of-service attacks if malformed messages can consistently crash the gNB-CU."
+      ],
+      "next_steps": [
+        "Analyze the code paths in 'openair2/F1AP/f1ap_decode.c:f1ap_decode_f1ap_setup_request' and 'openair2/F1AP/f1ap_cu_proc.c:f1ap_cu_process_f1ap_setup_request' to identify the exact point of failure when processing the mutated 'DU-Served-Cell-List'.",
+        "Implement robust error handling for invalid or malformed 'DU-Served-Cell-List' IEs, ensuring the gNB-CU rejects the request gracefully and remains stable.",
+        "Ensure an appropriate F1AP Setup Failure or Error Indication message is sent back to the gNB-DU upon detection of such errors.",
+        "Add unit and integration tests to cover F1AP Setup Request scenarios with malformed or invalid Information Elements, specifically targeting the 'DU-Served-Cell-List'."
+      ]
+    }
+  }
+}
