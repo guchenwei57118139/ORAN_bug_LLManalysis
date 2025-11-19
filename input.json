@@ -1,0 +1,38 @@
+{
+    "bug1":{
+        "input":"Bug: UE Context established after initial failure when a UE Context Setup Success message follows an incorrect UE Context Setup Request.\nRepro Steps:\n1) Attacker sends an incorrect UE Context Setup Request to the gNB-CU.\n2) gNB-CU rejects the request as expected.\n3) Attacker immediately sends a UE Context Setup Success.\n4) In parallel, attacker sends an initialRRCTransfer with mutated DU ID and Transaction ID.\n5) Attacker follows with an RRC Setup Success message.",
+        "output":"./report/report1.json"
+    },
+    "bug2":{
+        "input":"Bug: gNB-CU crashes when gNB-DU responds to UE Context Modification request with incorrect RNTI in IE.\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
+        "output":"./report/report2.json"
+    },
+    "bug3":{
+        "input":"Bug: CU registers UE and relies on RRC Setup Success when receiving initialRRCTransfer with mutated DU ID and Transaction ID before F1 Setup\nRepro Steps:\n1) Attacker sends an incorrect UE Context Setup Request to the gNB-CU.\n2) gNB-CU rejects the request as expected.\n3) Attacker immediately sends a UE Context Setup Success.\n4) In parallel, attacker sends an initialRRCTransfer with mutated DU ID and Transaction ID.\n5) Attacker follows with an RRC Setup Success message.",
+        "output":"./report/report3.json"
+    },
+    "bug4":{
+        "input":"Bug: gNB-CU experiences segmentation fault upon receiving UE Context Modification Response with mutated DU ID\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
+        "output":"./report/report4.json"
+    },
+    "bug5":{
+        "input":"Bug: gNB-CU hangs when receiving UE Context Release Complete with mutated DU ID.\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
+        "output":"./report/report5.json"
+    },
+    "bug6":{
+        "input":"Bug: gNB-CU hangs when receiving F1AP Setup Request with mutated DU-Served-Cell-List.\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
+        "output":"./report/report6.json"
+    },
+    "bug7":{
+        "input":"Bug: gNB-CU crashes when receiving F1AP Setup Response.\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
+        "output":"./report/report7.json"
+    },
+    "bug8":{
+        "input":"Bug: gNB-DU bypasses F1AP Setup procedure when receiving UEContextModificationRequest, and starts gtpu instance directly.\nRepro Steps:\n1) Attacker sends an incorrect UE Context Setup Request to the gNB-CU.\n2) gNB-CU rejects the request as expected.\n3) Attacker immediately sends a UE Context Setup Success.\n4) In parallel, attacker sends an initialRRCTransfer with mutated DU ID and Transaction ID.\n5) Attacker follows with an RRC Setup Success message.",
+        "output":"./report/report8.json"
+    },
+    "bug9":{
+        "input":"Bug: gNB-DU crashes when receiving DLRRCMessage Transfer after releasing UE.\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
+        "output":"./report/report9.json"
+    }
+}
