@@ -33,6 +33,8 @@ def inject_defs_into_schema(step_schema: dict, global_defs: dict) -> dict:
 def guess_mime(p: Path):
     if p.suffix.lower() == ".md":
         return "text/markdown"
+    if p.suffix.lower() in {".c", ".h", ".cpp", ".cc", ".hpp", ".txt", ".py"}:
+        return "text/plain"
     mt, _ = mimetypes.guess_type(str(p))
     return mt or "text/plain"
 
@@ -70,7 +72,7 @@ def mk_config(schema: dict, temperature=0.1):
     except TypeError:
         return GenerateContentConfig(response_json_schema=schema, **kwargs)
 
-def llm_call(client, model, step_obj, inputs: dict, attachments_paths=None, temperature=0.1, global_defs=None):
+def llm_call(client, model, step_obj, inputs: dict, attachments_paths=None, attachment_refs=None, temperature=0.1, global_defs=None):
     prompt = render_prompt(step_obj["llm_prompt_template"], inputs)
     prepared_schema = inject_defs_into_schema(step_obj["output_schema"], global_defs or {})
 
@@ -92,6 +94,9 @@ def llm_call(client, model, step_obj, inputs: dict, attachments_paths=None, temp
     for fp in attachments_paths or []:
         f = client.files.upload(file=fp, config={"mime_type": guess_mime(Path(fp))})
         attachments.append(f)
+        
+    if attachment_refs:
+        attachments.extend(attachment_refs)
 
     resp = client.models.generate_content(
         model=model, config=cfg, contents=parts + attachments
@@ -145,6 +150,32 @@ def build_spec_toc_from_bug(bug_card):
             "mime_type": "text/markdown",
         })
     return spec_toc, slice_paths
+
+def collect_code_paths(max_files: int = 80):
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    target_dir = os.path.join(project_root, "openairinterface5g-develop", "openair2", "F1AP")
+
+    if not os.path.isdir(target_dir):
+        print(f"[WARN] Cannot find code directory: {target_dir}")
+        return []
+
+    code_paths = []
+    for dirpath, dirnames, filenames in os.walk(target_dir):
+        for fname in filenames:
+            if fname.endswith((".c", ".h", ".cpp", ".cc", ".hpp")):
+                full_path = os.path.join(dirpath, fname)
+                code_paths.append(full_path)
+                if len(code_paths) >= max_files:
+                    return code_paths
+
+    return code_paths
+
+def upload_code_files_once(client, code_paths):
+    uploaded = []
+    for fp in code_paths:
+        f = client.files.upload(file=fp, config={"mime_type": "text/plain"})
+        uploaded.append(f)
+    return uploaded
 
 def validate_json(schema, data_text):
     data = json.loads(data_text)
@@ -241,9 +272,9 @@ def build_inputs_for_step(spec, ctx, step_idx, externals):
 
 
 
-def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None, temperature=0.1):
+def run_pipeline(spec_path: str, model: str, client, externals: dict, temperature=0.1):
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
-    client=genai.Client(api_key="AIzaSyBaqSqxBCfSsomsMGKLNISFvJU_h1Mwom0")
+    # client = genai.Client(api_key="AIzaSyBaqSqxBCfSsomsMGKLNISFvJU_h1Mwom0")
     #client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     ctx = {}
     global_defs = build_global_defs(spec)
@@ -257,11 +288,28 @@ def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None,
         inputs = build_inputs_for_step(spec, ctx, idx, externals)
 
         if idx == 1:
-            attach = externals.get("spec_slice_paths", [])
+            attach_paths = externals.get("spec_slice_paths", [])
+            attach_refs = None
+        elif idx == 2:
+            attach_paths = None
+            attach_refs = externals.get("code_files", [])
+        elif idx == 3:  
+            attach_paths = None
+            attach_refs = externals.get("code_files", [])
         else:
-            attach = None
+            attach_paths = None
+            attach_refs = None
 
-        raw = llm_call(client, model, step, inputs, attachments_paths=attach, temperature=temperature,global_defs=global_defs, )
+        raw = llm_call(
+            client,
+            model,
+            step,
+            inputs,
+            attachments_paths=attach_paths,
+            attachment_refs=attach_refs,
+            temperature=temperature,
+            global_defs=global_defs,
+        )
         prepared_schema = inject_defs_into_schema(step["output_schema"], global_defs)
 
         try:
@@ -274,18 +322,25 @@ def run_pipeline(spec_path: str, model: str, externals: dict, attach_files=None,
 
     return ctx
 if __name__ == "__main__":
+    client = genai.Client(api_key="AIzaSyBaqSqxBCfSsomsMGKLNISFvJU_h1Mwom0")
+    code_paths = collect_code_paths()
+    code_files = upload_code_files_once(client, code_paths)
+    print(f"[INFO] collected {len(code_paths)} code files for step3")
     for bug,values in input_dict.items():
         if bug=='bug1' or bug=='bug2' or bug=='bug3' or bug=='bug4' or bug=='bug5':continue
         bug_text=values['input']
         output_data={}
         fw=open(values['output'],'w')
-        externals={'bug_text':bug_text}    
+        externals = {
+            "bug_text": bug_text,
+            "code_files": code_files
+        }    
        # externals["spec_toc"]=[{'name':'F1AP.md',"mime_type":'text/markdown'}]
         ctx = run_pipeline(
             spec_path='QAprompt.json',
             model="gemini-2.5-flash",
+            client=client,  
             externals=externals,
-            attach_files=None,
             temperature=0.1
         )
         print(f"========={bug} report OK=========")

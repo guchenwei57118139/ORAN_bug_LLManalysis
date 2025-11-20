@@ -126,7 +126,8 @@
           }
         }
       },
-      "llm_prompt_template": "You are CodeLocator. Build a prioritized list of files/functions to fetch. Use interface names, procedure/timer, keywords. Plan recursion if initial fetch seems insufficient. Return JSON per output_schema.",
+      "llm_prompt_template": "You will receive BUG_CARD, CANDIDATE_SPEC_SECTIONS, and REPO_METADATA, plus attached C source/header files. Use interface/procedure/message names and identifiers to find relevant files and functions in the attached code. Return JSON exactly per output_schema; do not invent paths or function names.",
+      
       "output_schema": {
         "type": "object",
         "required": ["candidate_code"],
@@ -154,7 +155,7 @@
           "candidate_code": { "$ref": "#/steps/2/output_schema/properties/candidate_code" }
         }
       },
-      "llm_prompt_template": "You are SnippetRetriever. For each query, return top snippets with exact locations (spec id/anchor, file:line-range). Keep each snippet ≤ 120 words. Return JSON per output_schema.",
+      "llm_prompt_template": "You will receive candidate spec sections and candidate code, plus attached C source/header files.Read the attached code and extract only real snippets (verbatim) that match the spec procedures, messages, or identifiers. Return JSON exactly per output_schema; do not invent code or paths.",
       "output_schema": {
         "type": "object",
         "required": ["snippets"],
