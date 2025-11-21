@@ -287,7 +287,7 @@
       "llm_prompt_template": "You are ReportWriter. Produce the final JSON report with {verdict, rationale, citations, suggested_repro, risks, next_steps}. Be concise and actionable.",
       "output_schema": {
         "type": "object",
-        "required": ["report", "review_request"],
+        "required": ["report"],
         "properties": {
           "report": {
             "type": "object",
@@ -306,8 +306,7 @@
               "risks": { "type": "array", "items": { "type": "string" } },
               "next_steps": { "type": "array", "items": { "type": "string" } }
             }
-          },
-          "review_request": { "type": "string", "enum": ["HumanInLoop_C_required"] }
+          }
         }
       }
     }
