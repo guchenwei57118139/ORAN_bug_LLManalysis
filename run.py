@@ -381,7 +381,7 @@ def run_pipeline(spec_path: str, model: str, client, externals: dict, temperatur
 
     global_defs=spec.get("$defs",{})
     # step1-8
-    for idx in range(3):
+    for idx in range(8):
         step = spec["steps"][idx]
         step_name = step["step"]
         inputs = build_inputs_for_step(spec, ctx, idx, externals)
@@ -389,7 +389,7 @@ def run_pipeline(spec_path: str, model: str, client, externals: dict, temperatur
         if idx == 1:
             attach_paths = externals.get("spec_slice_paths", [])
             attach_refs = None
-        if idx == 2:
+        elif idx == 2:
             # 1) upload code tree.txt
             repo_root = Path("./openairinterface5g").expanduser().resolve()
             code_tree_path = './openairinterface5g__code_tree.txt'
@@ -435,7 +435,7 @@ def run_pipeline(spec_path: str, model: str, client, externals: dict, temperatur
                         break
                     dynamic_refs.extend(new_refs)
                     iteration += 1
-                    input("step3 fetch continue ...")
+                    # input("step3 fetch continue ...")
                     continue
                 else:
                     break
@@ -487,7 +487,6 @@ if __name__ == "__main__":
     # code_files = upload_code_files_once(client, code_paths)
     # print(f"[INFO] collected {len(code_paths)} code files for step3")
     for bug,values in input_dict.items():
-        if bug=='bug1':continue
         bug_text=values['input']
         output_data={}
         fw=open(values['output'],'w')

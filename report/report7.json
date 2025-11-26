@@ -33,8 +33,8 @@
           "F1AP Setup",
           "F1AP Setup Response",
           "gNB-CU",
-          "gNB-DU",
-          "Procedure"
+          "F1 interface",
+          "crash handling"
         ],
         "title": [
           "slice_1_F1AP_Setup_Procedure.md"
@@ -43,260 +43,342 @@
       {
         "Keywords": [
           "UE Context Modification",
+          "UE Context",
           "radio resources",
           "sidelink resources",
-          "gNB-DU",
-          "gNB-CU",
-          "UE Context Modification request"
+          "UE-associated signalling"
         ],
         "title": [
           "slice_2_UE_Context_Modification_Procedure.md",
-          "8.3.4.1 General",
+          "8.3.4.1 General"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Modification",
+          "DRB",
+          "GTP-U tunnels",
+          "PDCP duplication",
+          "Duplication Activation IE"
+        ],
+        "title": [
+          "slice_2_UE_Context_Modification_Procedure.md",
           "8.3.4.2 Successful Operation"
         ]
       },
       {
         "Keywords": [
           "UE Release",
-          "Procedure",
+          "UE Context Release",
           "gNB-CU",
-          "gNB-DU",
-          "UE"
+          "gNB-DU"
         ],
         "title": [
           "slice_3_UE_Release_Procedure.md"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-CU shall successfully process the F1AP Setup Response message without crashing, establishing the F1AP interface with the gNB-DU."
+    "expected_behaviour": "The gNB-CU shall successfully process the F1AP Setup Response without crashing, thereby establishing the F1 interface."
   },
   "step3": {
     "candidate_code": [
       {
-        "path": "openair2/F1AP/f1ap_handlers.c",
-        "function_name": "f1ap_handle_message",
-        "reason": "The gNB-CU is crashing when receiving an F1AP Setup Response. The `f1ap_handle_message` function dispatches incoming messages based on a table. The current dispatch table `f1ap_messages_processing` incorrectly maps the F1AP Setup procedure's successful outcome (response) to a DU-side handler (`DU_handle_F1_SETUP_RESPONSE`), leading to a crash when invoked on the CU."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_du_interface_management.c",
-        "function_name": "DU_handle_F1_SETUP_RESPONSE",
-        "reason": "This function is designed to handle F1AP Setup Responses on the gNB-DU. If it's being invoked on the gNB-CU (as implied by the bug and the dispatch logic in `f1ap_handle_message`), it will operate on incorrect context or data structures, leading to a crash."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_cu_task.c",
-        "function_name": "F1AP_CU_task",
-        "reason": "This is the main task loop for the gNB-CU. It receives SCTP data indications and dispatches them to `f1ap_handle_message`, which then incorrectly calls a DU-side handler for the F1AP Setup Response, leading to the observed crash."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_cu_interface_management.h",
-        "function_name": "(definitions)",
-        "reason": "This header defines CU-side F1AP interface management functions. The absence of a `CU_handle_F1_SETUP_RESPONSE` function here, while the bug states the CU is *receiving* the response, indicates a missing handler that contributes to the dispatch issue."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_common.c",
-        "function_name": "getCxt",
-        "reason": "Contains F1AP context management functions. If a DU-side handler is incorrectly invoked on the CU, it might attempt to access CU-specific context using DU-specific logic, or vice-versa, leading to a crash."
+        "path": "openair2/F1AP/f1ap_cu_interface_management.c",
+        "function_name": "CU_handle_F1_SETUP_RESPONSE",
+        "reason": "gNB-CU crashes when receiving F1AP Setup Response. This function is the primary handler for this message on the CU side."
       },
       {
         "path": "openair2/F1AP/lib/f1ap_interface_management.c",
         "function_name": "decode_f1ap_setup_response",
-        "reason": "This function is responsible for decoding the F1AP Setup Response. If the `DU_handle_F1_SETUP_RESPONSE` is called on the CU, it will attempt to decode the message using this function. A crash could occur during the decoding process if the message format is unexpected or corrupted, or if subsequent processing of the decoded message is flawed."
+        "reason": "The crash occurs when receiving the F1AP Setup Response. This function is responsible for decoding the incoming message, making it a critical point for potential parsing errors or malformed messages."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "This is the central dispatcher for all F1AP messages. The crash could occur during message reception, initial parsing, or before dispatching to the specific handler."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_decode_pdu",
+        "reason": "This function is called by f1ap_handle_message to decode the raw F1AP PDU. A crash here would indicate a fundamental issue with the message's structure or the decoding process."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_task.c",
+        "function_name": "F1AP_CU_task",
+        "reason": "This is the main task loop for the F1AP CU. The crash could originate from the message reception or initial processing within this task."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_common.c",
+        "function_name": "getCxt",
+        "reason": "This function retrieves the F1AP context. A crash could be related to an invalid context or corrupted data within it."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_interface_management.c",
+        "function_name": "DU_send_F1_SETUP_RESPONSE",
+        "reason": "While the crash is on the CU receiving, the DU is sending the F1AP Setup Response. A bug in the DU's sending logic could lead to a malformed message that causes the CU to crash."
+      },
+      {
+        "path": "openair2/GNB_APP/gnb_config.c",
+        "function_name": "RCconfig_NRRRC",
+        "reason": "Configuration of the gNB-CU, including F1AP parameters. Incorrect configuration could lead to unexpected message content or processing."
+      },
+      {
+        "path": "openair2/GNB_APP/gnb_app.c",
+        "function_name": "gNB_app_task",
+        "reason": "The main application task for the gNB. It orchestrates the F1AP setup and could be involved in the overall state leading to the crash."
       }
-    ]
+    ],
+    "control": {
+      "decision": "continue",
+      "fetch_requests": [
+        {
+          "pattern": "openair2/F1AP/**/*.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ],
+          "max_files": 20
+        },
+        {
+          "pattern": "openair2/GNB_APP/**/*.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ],
+          "max_files": 10
+        },
+        {
+          "pattern": "openair2/RRC/NR/**/*.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ],
+          "max_files": 10
+        }
+      ]
+    }
   },
   "step4": {
     "snippets": [
       {
-        "kind": "code",
-        "source": "static const f1ap_message_processing_t f1ap_messages_processing[][3] = { {DU_handle_RESET, CU_handle_RESET_ACKNOWLEDGE, 0}, /* Reset */ {CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}, /* F1Setup */ {0, 0, 0}, /* ErrorIndication */ {CU_handle_gNB_DU_CONFIGURATION_UPDATE, DU_handle_gNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE, 0}, /* gNBDUConfigurationUpdate */ {DU_handle_gNB_CU_CONFIGURATION_UPDATE, CU_handle_gNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE, 0}, /* gNBCUConfigurationUpdate */ {DU_handle_UE_CONTEXT_SETUP_REQUEST, CU_handle_UE_CONTEXT_SETUP_RESPONSE, 0}, /* UEContextSetup */ {DU_handle_UE_CONTEXT_RELEASE_COMMAND, CU_handle_UE_CONTEXT_RELEASE_COMPLETE, 0}, /* UEContextRelease */ {DU_handle_UE_CONTEXT_MODIFICATION_REQUEST, CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE, 0}, /* UEContextModification */ {CU_handle_UE_CONTEXT_MODIFICATION_REQUIRED, DU_handle_UE_CONTEXT_MODIFICATION_CONFIRM, DU_handle_UE_CONTEXT_MODIFICATION_REFUSE}, /* UEContextModificationRequired */ {0, 0, 0}, /* UEMobilityCommand */ {CU_handle_UE_CONTEXT_RELEASE_REQUEST, 0, 0}, /* UEContextReleaseRequest */ {CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER, 0, 0}, /* InitialULRRCMessageTransfer */ {DU_handle_DL_RRC_MESSAGE_TRANSFER, 0, 0}, /* DLRRCMessageTransfer */ {CU_handle_UL_RRC_MESSAGE_TRANSFER, 0, 0}, /* ULRRCMessageTransfer */ {0, 0, 0}, /* privateMessage */ {0, 0, 0}, /* UEInactivityNotification */ {0, 0, 0}, /* GNBDUResourceCoordination */ {0, 0, 0}, /* SystemInformationDeliveryCommand */ {DU_handle_Paging, 0, 0}, /* Paging */ {0, 0, 0}, /* Notify */ {0, 0, 0}, /* WriteReplaceWarning */ {0, 0, 0}, /* PWSCancel */ {0, 0, 0}, /* PWSRestartIndication */ {0, 0, 0}, /* PWSFailureIndication */ }; const char *f1ap_direction2String(int f1ap_dir) { static const char *const f1ap_direction_String[] = { \"\", /* Nothing */ \"Initiating message\", /* initiating message */ \"Successfull outcome\", /* successfull outcome */ \"UnSuccessfull outcome\", /* successfull outcome */ }; return(f1ap_direction_String[f1ap_dir]); } static F1AP_F1AP_PDU_t *f1ap_decode_pdu(const uint8_t *const buffer, uint32_t length) { DevAssert(buffer != NULL); asn_codec_ctx_t st = {.max_stack_size = 100 * 1000}; F1AP_F1AP_PDU_t *pdu = NULL; asn_dec_rval_t dec_ret = aper_decode(&st, &asn_DEF_F1AP_F1AP_PDU, (void **)&pdu, buffer, length, 0, 0); if (LOG_DEBUGFLAG(DEBUG_ASN1)) { LOG_E(F1AP, \"----------------- ASN1 DECODER PRINT START----------------- \\n\"); xer_fprint(stdout, &asn_DEF_F1AP_F1AP_PDU, pdu); LOG_E(F1AP, \"----------------- ASN1 DECODER PRINT END ----------------- \\n\"); } return dec_ret.code == RC_OK ? pdu : NULL; } int f1ap_handle_message(instance_t instance, sctp_assoc_t assoc_id, int32_t stream, const uint8_t *const data, const uint32_t data_length) { DevAssert(data != NULL); F1AP_F1AP_PDU_t *pdu = f1ap_decode_pdu(data, data_length); if (pdu == NULL) { LOG_E(F1AP, \"Failed to decode PDU\\n\"); return -1; } /* Checking procedure Code and direction of message */ if (pdu->choice.initiatingMessage->procedureCode >= sizeof(f1ap_messages_processing) / (3 * sizeof(f1ap_message_processing_t)) || (pdu->present > F1AP_F1AP_PDU_PR_unsuccessfulOutcome)) { LOG_E(F1AP, \"[SCTP %d] Either procedureCode %ld or direction %d exceed expected\\n\", assoc_id, pdu->choice.initiatingMessage->procedureCode, pdu->present); ASN_STRUCT_FREE(asn_DEF_F1AP_F1AP_PDU, pdu); return -1; } int ret; if (f1ap_messages_processing[pdu->choice.initiatingMessage->procedureCode][pdu->present - 1] == NULL) { // No handler present. This can mean not implemented or no procedure for eNB (wrong direction). LOG_E(F1AP, \"[SCTP %d] No handler for procedureCode %ld in %s\\n\", assoc_id, pdu->choice.initiatingMessage->procedureCode, f1ap_direction2String(pdu->present - 1)); ret=-1; } else { /* Calling the right handler */ LOG_D(F1AP, \"Calling handler with instance %ld\\n\",instance); ret = (*f1ap_messages_processing[pdu->choice.initiatingMessage->procedureCode][pdu->present - 1])(instance, assoc_id, stream, pdu); } ASN_STRUCT_FREE(asn_DEF_F1AP_F1AP_PDU, pdu); return ret; }",
-        "location": "openair2/F1AP/f1ap_handlers.c:36:1"
-      },
-      {
-        "kind": "code",
-        "source": "int DU_handle_F1_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu) { LOG_D(F1AP, \"DU_handle_F1_SETUP_RESPONSE\\n\"); /* Decode */ f1ap_setup_resp_t resp = {0}; if (!decode_f1ap_setup_response(pdu, &resp)) { LOG_E(F1AP, \"cannot decode F1AP Setup Response\\n\"); free_f1ap_setup_response(&resp); return -1; } LOG_D(F1AP, \"Sending F1AP_SETUP_RESP ITTI message\\n\"); f1_setup_response(&resp); // free F1AP message after use free_f1ap_setup_response(&resp); return 0; }",
-        "location": "openair2/F1AP/f1ap_du_interface_management.c:106:1"
-      },
-      {
-        "kind": "code",
-        "source": "void *F1AP_CU_task(void *arg) { MessageDef *received_msg = NULL; int result; LOG_I(F1AP, \"Starting F1AP at CU\\n\"); // no RLC in CU, initialize mem pool for PDCP itti_mark_task_ready(TASK_CU_F1); eth_params_t *IPaddrs; // Hardcoded instance id! IPaddrs = &RC.nrrrc[0]->eth_params_s; const int instance = 0; createF1inst(instance, NULL, NULL); cu_task_send_sctp_init_req(instance, IPaddrs->my_addr); if (RC.nrrrc[instance]->node_type != ngran_gNB_CUCP) { getCxt(instance)->gtpInst = cu_task_create_gtpu_instance(IPaddrs); AssertFatal(getCxt(instance)->gtpInst > 0, \"Failed to create CU F1-U UDP listener\"); } else { LOG_I(F1AP, \"In F1AP connection, don't start GTP-U, as we have also E1AP\\n\"); } // Fixme: fully inconsistent instances management // dirty global var is a bad fix CUuniqInstance=getCxt(instance)->gtpInst; while (1) { itti_receive_msg(TASK_CU_F1, &received_msg); sctp_assoc_t assoc_id = ITTI_MSG_ORIGIN_INSTANCE(received_msg); LOG_D(F1AP, \"CU Task Received %s for instance %ld: sending SCTP message via assoc_id %d\\n\", ITTI_MSG_NAME(received_msg), ITTI_MSG_DESTINATION_INSTANCE(received_msg), assoc_id); switch (ITTI_MSG_ID(received_msg)) { case SCTP_NEW_ASSOCIATION_IND: cu_task_handle_sctp_association_ind(ITTI_MSG_ORIGIN_INSTANCE(received_msg), &received_msg->ittiMsg.sctp_new_association_ind, IPaddrs); break; case SCTP_NEW_ASSOCIATION_RESP: cu_task_handle_sctp_association_resp(ITTI_MSG_DESTINATION_INSTANCE(received_msg), &received_msg->ittiMsg.sctp_new_association_resp); break; case SCTP_DATA_IND: cu_task_handle_sctp_data_ind(ITTI_MSG_DESTINATION_INSTANCE(received_msg), &received_msg->ittiMsg.sctp_data_ind); break; case F1AP_RESET: CU_send_RESET(assoc_id, &F1AP_RESET(received_msg)); free_f1ap_reset(&F1AP_RESET(received_msg)); break; case F1AP_RESET_ACK: CU_send_RESET_ACKNOWLEDGE(assoc_id, &F1AP_RESET_ACK(received_msg)); break; case F1AP_SETUP_RESP: // from rrc CU_send_F1_SETUP_RESPONSE(assoc_id, &F1AP_SETUP_RESP(received_msg)); break; case F1AP_SETUP_FAILURE: CU_send_F1_SETUP_FAILURE(assoc_id, &F1AP_SETUP_FAILURE(received_msg)); break; case F1AP_GNB_CU_CONFIGURATION_UPDATE: // from rrc CU_send_gNB_CU_CONFIGURATION_UPDATE(assoc_id, &F1AP_GNB_CU_CONFIGURATION_UPDATE(received_msg)); break; case F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE: CU_send_gNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(assoc_id, &F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(received_msg)); break; case F1AP_DL_RRC_MESSAGE: // from rrc CU_send_DL_RRC_MESSAGE_TRANSFER(assoc_id, &F1AP_DL_RRC_MESSAGE(received_msg)); free_dl_rrc_message_transfer(&F1AP_DL_RRC_MESSAGE(received_msg)); break; case F1AP_UE_CONTEXT_SETUP_REQ: // from rrc CU_send_UE_CONTEXT_SETUP_REQUEST(assoc_id, &F1AP_UE_CONTEXT_SETUP_REQ(received_msg)); free_ue_context_setup_req(&F1AP_UE_CONTEXT_SETUP_REQ(received_msg)); break; case F1AP_UE_CONTEXT_MODIFICATION_REQ: CU_send_UE_CONTEXT_MODIFICATION_REQUEST(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg)); free_ue_context_mod_req(&F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg)); break; case F1AP_UE_CONTEXT_RELEASE_CMD: // from rrc CU_send_UE_CONTEXT_RELEASE_COMMAND(assoc_id, &F1AP_UE_CONTEXT_RELEASE_CMD(received_msg)); free_ue_context_rel_cmd(&F1AP_UE_CONTEXT_RELEASE_CMD(received_msg)); break; case F1AP_PAGING_IND: CU_send_Paging(assoc_id, &F1AP_PAGING_IND(received_msg)); break; case F1AP_UE_CONTEXT_MODIFICATION_CONFIRM: CU_send_UE_CONTEXT_MODIFICATION_CONFIRM(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_CONFIRM(received_msg)); break; case F1AP_UE_CONTEXT_MODIFICATION_REFUSE: CU_send_UE_CONTEXT_MODIFICATION_REFUSE(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_REFUSE(received_msg)); break; case TERMINATE_MESSAGE: LOG_W(F1AP, \" *** Exiting F1AP thread\\n\"); itti_exit_task(); break; default: LOG_E(F1AP, \"CU Received unhandled message: %d:%s\\n\", ITTI_MSG_ID(received_msg), ITTI_MSG_NAME(received_msg)); break; } // switch result = itti_free (ITTI_MSG_ORIGIN_ID(received_msg), received_msg); AssertFatal (result == EXIT_SUCCESS, \"Failed to free memory (%d)!\\n\", result); received_msg = NULL; } // while destroyF1inst(instance); return NULL; }",
-        "location": "openair2/F1AP/f1ap_cu_task.c:30:1"
-      },
-      {
-        "kind": "code",
-        "source": "/*\n * F1 Setup\n */\nint CU_handle_F1_SETUP_REQUEST(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu);\n\nint CU_send_F1_SETUP_RESPONSE(sctp_assoc_t assoc_id, f1ap_setup_resp_t *f1ap_setup_resp);\n\nint CU_send_F1_SETUP_FAILURE(sctp_assoc_t assoc_id, const f1ap_setup_failure_t *fail);",
-        "location": "openair2/F1AP/f1ap_cu_interface_management.h:26:1"
-      },
-      {
-        "kind": "code",
-        "source": "f1ap_cudu_inst_t *getCxt(instance_t instanceP) { DevAssert(instanceP == 0); return f1_inst[instanceP]; }",
-        "location": "openair2/F1AP/f1ap_common.c:16:1"
-      },
-      {
-        "kind": "code",
-        "source": "bool decode_f1ap_setup_response(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_resp_t *out) { /* Check presence of message type */ _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_successfulOutcome); _F1_EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, F1AP_ProcedureCode_id_F1Setup); _F1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present, F1AP_SuccessfulOutcome__value_PR_F1SetupResponse); /* Check presence of mandatory IEs */ F1AP_F1SetupResponse_t *in = &pdu->choice.successfulOutcome->value.choice.F1SetupResponse; F1AP_F1SetupResponseIEs_t *ie; F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true); F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_GNB_CU_RRC_Version, true); /* Loop over all IEs */ for (int i = 0; i < in->protocolIEs.list.count; i++) { ie = in->protocolIEs.list.array[i]; switch (ie->id) { case F1AP_ProtocolIE_ID_id_TransactionID: // Transaction ID (M) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_TransactionID); AssertError(ie->value.choice.TransactionID != -1, return false, \"ie->value.choice.TransactionID is -1\"); out->transaction_id = ie->value.choice.TransactionID; break; case F1AP_ProtocolIE_ID_id_gNB_CU_Name: { // gNB-CU Name (O) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_GNB_CU_Name); const F1AP_GNB_CU_Name_t *cu_name = &ie->value.choice.GNB_CU_Name; out->gNB_CU_name = calloc_or_fail(cu_name->size + 1, sizeof(*out->gNB_CU_name)); strncpy(out->gNB_CU_name, (char *)cu_name->buf, cu_name->size); } break; case F1AP_ProtocolIE_ID_id_GNB_CU_RRC_Version: // gNB-CU RRC version (M) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_RRC_Version); // RRC Version: \"This IE is not used in this release.\" if (ie->value.choice.RRC_Version.iE_Extensions) { F1AP_ProtocolExtensionContainer_10696P228_t *ext = (F1AP_ProtocolExtensionContainer_10696P228_t *)ie->value.choice.RRC_Version.iE_Extensions; if (ext->list.count > 0) { F1AP_RRC_Version_ExtIEs_t *rrcext = ext->list.array[0]; OCTET_STRING_t *os = &rrcext->extensionValue.choice.OCTET_STRING_SIZE_3_; for (int i = 0; i < sizeofArray(out->rrc_ver); i++) out->rrc_ver[i] = os->buf[i]; } } break; case F1AP_ProtocolIE_ID_id_Cells_to_be_Activated_List: { // Cells to be Activated List (O) if (ie->value.present != F1AP_F1SetupResponseIEs__value_PR_Cells_to_be_Activated_List) break; struct F1AP_Cells_to_be_Activated_List *Cells_to_be_Activated_List = &ie->value.choice.Cells_to_be_Activated_List; out->num_cells_to_activate = Cells_to_be_Activated_List->list.count; // Loop Cells to be Activated List Items (count >= 1) AssertError(out->num_cells_to_activate > 0, return false, \"At least 1 cell must be present\"); for (int i = 0; i < out->num_cells_to_activate; i++) { const F1AP_Cells_to_be_Activated_List_ItemIEs_t *itemIEs = (F1AP_Cells_to_be_Activated_List_ItemIEs_t *)Cells_to_be_Activated_List->list.array[i]; if (!decode_cells_to_activate(&out->cells_to_activate[i], itemIEs)) return false; } break; } default: AssertError(1 == 0, return false, \"F1AP_ProtocolIE_ID_id %ld unknown\\n\", ie->id); break; } } return true; }",
-        "location": "openair2/F1AP/lib/f1ap_interface_management.c:647:1"
-      },
-      {
         "kind": "spec",
-        "source": "The F1AP Setup procedure is used to establish the F1 interface between a gNB-CU and a gNB-DU. This procedure involves the exchange of F1 Setup Request and F1 Setup Response messages to convey configuration information and establish the necessary F1AP signalling connection.",
+        "source": "slice_1_F1AP_Setup_Procedure.md",
         "location": "slice_1_F1AP_Setup_Procedure.md"
       },
       {
         "kind": "spec",
-        "source": "The UE Context Modification procedure is used to modify the UE context in the gNB-DU, including radio resources and sidelink resources, based on requests from the gNB-CU. This procedure ensures that the gNB-DU's configuration for a specific UE is updated to reflect changes in its radio access bearer setup or other parameters.",
+        "source": "slice_2_UE_Context_Modification_Procedure.md - 8.3.4.1 General",
         "location": "slice_2_UE_Context_Modification_Procedure.md"
       },
       {
         "kind": "spec",
-        "source": "The UE Release procedure is initiated by either the gNB-CU or gNB-DU to release the UE context and associated resources. This procedure ensures that all radio and core network resources allocated to a specific UE are properly deallocated when the UE's connection is terminated.",
+        "source": "slice_2_UE_Context_Modification_Procedure.md - 8.3.4.2 Successful Operation",
+        "location": "slice_2_UE_Context_Modification_Procedure.md"
+      },
+      {
+        "kind": "spec",
+        "source": "slice_3_UE_Release_Procedure.md",
         "location": "slice_3_UE_Release_Procedure.md"
+      },
+      {
+        "kind": "code",
+        "source": "CU_handle_F1_SETUP_RESPONSE: gNB-CU crashes when receiving F1AP Setup Response. This function is the primary handler for this message on the CU side.",
+        "location": "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_RESPONSE"
+      },
+      {
+        "kind": "code",
+        "source": "decode_f1ap_setup_response: The crash occurs when receiving the F1AP Setup Response. This function is responsible for decoding the incoming message, making it a critical point for potential parsing errors or malformed messages.",
+        "location": "openair2/F1AP/lib/f1ap_interface_management.c:decode_f1ap_setup_response"
+      },
+      {
+        "kind": "code",
+        "source": "f1ap_handle_message: This is the central dispatcher for all F1AP messages. The crash could occur during message reception, initial parsing, or before dispatching to the specific handler.",
+        "location": "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message"
+      },
+      {
+        "kind": "code",
+        "source": "f1ap_decode_pdu: This function is called by f1ap_handle_message to decode the raw F1AP PDU. A crash here would indicate a fundamental issue with the message's structure or the decoding process.",
+        "location": "openair2/F1AP/f1ap_handlers.c:f1ap_decode_pdu"
+      },
+      {
+        "kind": "code",
+        "source": "F1AP_CU_task: This is the main task loop for the F1AP CU. The crash could originate from the message reception or initial processing within this task.",
+        "location": "openair2/F1AP/f1ap_cu_task.c:F1AP_CU_task"
+      },
+      {
+        "kind": "code",
+        "source": "getCxt: This function retrieves the F1AP context. A crash could be related to an invalid context or corrupted data within it.",
+        "location": "openair2/F1AP/f1ap_common.c:getCxt"
+      },
+      {
+        "kind": "code",
+        "source": "DU_send_F1_SETUP_RESPONSE: While the crash is on the CU receiving, the DU is sending the F1AP Setup Response. A bug in the DU's sending logic could lead to a malformed message that causes the CU to crash.",
+        "location": "openair2/F1AP/f1ap_du_interface_management.c:DU_send_F1_SETUP_RESPONSE"
+      },
+      {
+        "kind": "code",
+        "source": "RCconfig_NRRRC: Configuration of the gNB-CU, including F1AP parameters. Incorrect configuration could lead to unexpected message content or processing.",
+        "location": "openair2/GNB_APP/gnb_config.c:RCconfig_NRRRC"
+      },
+      {
+        "kind": "code",
+        "source": "gNB_app_task: The main application task for the gNB. It orchestrates the F1AP setup and could be involved in the overall state leading to the crash.",
+        "location": "openair2/GNB_APP/gnb_app.c:gNB_app_task"
       }
     ]
   },
   "step5": {
     "sequence_diagram": [
       {
-        "from": "gNB-CU",
-        "to": "gNB-DU",
+        "from": "gNB-DU",
+        "to": "gNB-CU",
         "message": "F1AP Setup Request",
         "precond": "F1AP interface is not established.",
-        "postcond": "gNB-DU receives F1AP Setup Request."
+        "postcond": "gNB-CU initiates F1AP Setup processing."
       },
       {
-        "from": "gNB-DU",
+        "from": "gNB-CU",
         "to": "gNB-DU",
-        "message": "Process F1AP Setup Request",
-        "precond": "gNB-DU received F1AP Setup Request.",
-        "postcond": "gNB-DU prepares F1AP Setup Response."
+        "message": "F1AP Setup Response",
+        "precond": "gNB-CU successfully processed F1AP Setup Request.",
+        "postcond": "F1AP interface is established from gNB-CU's perspective."
       },
       {
         "from": "gNB-DU",
         "to": "gNB-CU",
         "message": "F1AP Setup Response",
-        "precond": "gNB-DU successfully processed F1AP Setup Request.",
-        "postcond": "gNB-CU receives F1AP Setup Response."
+        "precond": "gNB-DU sends an F1AP Setup Response (potentially due to an error or retransmission logic).",
+        "postcond": "gNB-CU receives an unexpected F1AP Setup Response."
       },
       {
         "from": "gNB-CU",
         "to": "gNB-CU",
-        "message": "Handle F1AP Setup Response (calls DU_handle_F1_SETUP_RESPONSE)",
-        "precond": "gNB-CU received F1AP Setup Response.",
-        "postcond": "gNB-CU crashes due to incorrect handler dispatch."
+        "message": "Decode F1AP Setup Response",
+        "precond": "gNB-CU received an F1AP Setup Response from gNB-DU.",
+        "postcond": "gNB-CU crashes during decoding or handling of the message."
       }
     ],
     "state_machine": {
       "states": [
-        "F1_DOWN",
-        "F1_SETUP_REQUEST_SENT",
-        "F1_SETUP_RESPONSE_PROCESSING",
-        "F1_UP",
-        "F1_SETUP_FAILED",
-        "CU_CRASHED"
+        "F1AP_DOWN",
+        "F1AP_SETUP_REQUEST_RECEIVED",
+        "F1AP_SETUP_RESPONSE_SENT",
+        "F1AP_UP",
+        "RECEIVING_UNEXPECTED_F1AP_RESPONSE",
+        "CRASHED"
       ],
       "transitions": [
         {
-          "from": "F1_DOWN",
-          "to": "F1_SETUP_REQUEST_SENT",
-          "on": "F1AP_Setup_Initiated"
+          "from": "F1AP_DOWN",
+          "to": "F1AP_SETUP_REQUEST_RECEIVED",
+          "on": "F1AP Setup Request (from DU)"
         },
         {
-          "from": "F1_SETUP_REQUEST_SENT",
-          "to": "F1_SETUP_RESPONSE_PROCESSING",
-          "on": "F1AP_Setup_Response_Received"
+          "from": "F1AP_SETUP_REQUEST_RECEIVED",
+          "to": "F1AP_SETUP_RESPONSE_SENT",
+          "on": "F1AP Setup Response (to DU)",
+          "guard": "Request processed successfully"
         },
         {
-          "from": "F1_SETUP_RESPONSE_PROCESSING",
-          "to": "CU_CRASHED",
-          "on": "Internal_Handler_Dispatch",
-          "guard": "Incorrect_Handler_Called (DU_handle_F1_SETUP_RESPONSE)"
+          "from": "F1AP_SETUP_RESPONSE_SENT",
+          "to": "F1AP_UP",
+          "on": "F1AP Setup Confirmed",
+          "guard": "No error from DU"
         },
         {
-          "from": "F1_SETUP_RESPONSE_PROCESSING",
-          "to": "F1_UP",
-          "on": "Internal_Handler_Dispatch",
-          "guard": "Correct_Handler_Called (CU_handle_F1_SETUP_RESPONSE) (if bug fixed)"
+          "from": "F1AP_UP",
+          "to": "RECEIVING_UNEXPECTED_F1AP_RESPONSE",
+          "on": "F1AP Setup Response (from DU)",
+          "guard": "Message received from DU while F1AP_UP"
         },
         {
-          "from": "F1_SETUP_REQUEST_SENT",
-          "to": "F1_SETUP_FAILED",
-          "on": "F1AP_Setup_Failure_Received"
+          "from": "RECEIVING_UNEXPECTED_F1AP_RESPONSE",
+          "to": "CRASHED",
+          "on": "Decode F1AP Setup Response",
+          "guard": "Decoding error or unexpected message content"
         },
         {
-          "from": "F1_SETUP_REQUEST_SENT",
-          "to": "F1_SETUP_FAILED",
-          "on": "F1AP_Setup_Timer_Expired"
-        },
-        {
-          "from": "F1_SETUP_FAILED",
-          "to": "F1_DOWN",
-          "on": "Retry_F1AP_Setup"
-        },
-        {
-          "from": "F1_UP",
-          "to": "F1_DOWN",
-          "on": "F1AP_Reset_Received_or_Link_Failure"
+          "from": "F1AP_SETUP_REQUEST_RECEIVED",
+          "to": "F1AP_DOWN",
+          "on": "F1AP Setup Failure",
+          "guard": "Request processing failed"
         }
       ]
     },
     "assumptions": [
-      "The 'f1ap_messages_processing' table is a shared dispatch table used by both gNB-CU and gNB-DU for incoming F1AP messages.",
-      "The 'pdu->present' value correctly indicates the message direction (initiating, successful outcome, unsuccessful outcome).",
-      "The 'DU_handle_F1_SETUP_RESPONSE' function, when executed in the gNB-CU context, attempts to access gNB-DU specific resources or context, leading to a crash.",
-      "The F1AP Setup procedure is initiated by the gNB-CU, and the gNB-DU responds to it.",
-      "The 'F1AP_SETUP_RESP' ITTI message handled by 'F1AP_CU_task' is an internal message triggering the CU to send an F1AP Setup Response, not to process an incoming one."
+      "The bug report 'gNB-CU crashes when receiving F1AP Setup Response' is accurate, implying the gNB-DU is sending this message.",
+      "The F1AP Setup Procedure is typically initiated by the gNB-DU, and the gNB-CU responds.",
+      "The gNB-DU sending an F1AP Setup Response to the gNB-CU is an unexpected event in the normal F1AP Setup Procedure flow, especially after the CU has already sent its own response.",
+      "The crash occurs during the decoding or initial handling of this unexpected F1AP Setup Response message by the gNB-CU.",
+      "The 'incorrect value' for 'rnti' in the bug card is likely not directly related to the F1AP Setup crash, as F1AP Setup is an interface-level procedure, not UE-specific."
     ],
     "questions": [
-      "Is there a 'CU_handle_F1_SETUP_RESPONSE' function intended for processing the F1AP Setup Response in the gNB-CU, or should the CU not expect to receive this message?",
-      "How is the 'f1ap_messages_processing' table populated/configured for the gNB-CU vs. gNB-DU? Should there be separate dispatch tables for each component?",
-      "What specific resource or context access within 'DU_handle_F1_SETUP_RESPONSE' causes the gNB-CU to crash?",
-      "What is the expected behavior of the gNB-CU upon successfully receiving and processing an F1AP Setup Response?",
-      "Is the 'key_ids: {\"rnti\": \"incorrect value\"}' from the bug card relevant to the F1AP Setup procedure, or is it a misdirection?"
+      "Why is the gNB-DU sending an F1AP Setup Response to the gNB-CU? Is it a retransmission, an error state, or a misconfigured DU?",
+      "What is the exact content of the F1AP Setup Response message sent by the gNB-DU that causes the gNB-CU to crash? Is it malformed, or does it contain unexpected Information Elements (IEs)?",
+      "Does the gNB-CU have any state or error handling logic for receiving an F1AP Setup Response message, or is it always assumed that the CU only sends this message?",
+      "Is the crash due to a parsing error (e.g., in 'decode_f1ap_setup_response' or 'f1ap_decode_pdu') or a logic error in 'CU_handle_F1_SETUP_RESPONSE' when processing an unexpected message?",
+      "What is the state of the F1AP interface on both gNB-CU and gNB-DU when the unexpected F1AP Setup Response is sent/received?"
     ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "Directionality of F1AP Setup Response handler",
+        "name": "F1AP Setup Response Directionality",
         "result": "FAIL",
         "evidence": [
-          "openair2/F1AP/f1ap_handlers.c:36:1: static const f1ap_message_processing_t f1ap_messages_processing[][3] = { {DU_handle_RESET, CU_handle_RESET_ACKNOWLEDGE, 0}, /* Reset */ {CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}, /* F1Setup */",
-          "openair2/F1AP/f1ap_du_interface_management.c:106:1: int DU_handle_F1_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu) { LOG_D(F1AP, \"DU_handle_F1_SETUP_RESPONSE\\n\");",
-          "openair2/F1AP/f1ap_cu_interface_management.h:26:1: int CU_send_F1_SETUP_RESPONSE(sctp_assoc_t assoc_id, f1ap_setup_resp_t *f1ap_setup_resp);"
+          "bug_card.observed_behavior: gNB-CU crashes when receiving F1AP Setup Response.",
+          "sequence_diagram[2]: from: gNB-DU, to: gNB-CU, message: F1AP Setup Response",
+          "state_machine.transitions[3]: on: F1AP Setup Response (from DU)",
+          "snippets[0]: slice_1_F1AP_Setup_Procedure.md (This specification defines F1AP Setup Response as a message sent from CU to DU)."
         ]
       },
       {
-        "name": "Req/Resp pairing for F1AP Setup",
+        "name": "F1AP Setup Response Pairing",
+        "result": "FAIL",
+        "evidence": [
+          "sequence_diagram[1]: from: gNB-CU, to: gNB-DU, message: F1AP Setup Response (This is the expected response from CU to DU after a request from DU).",
+          "sequence_diagram[2]: from: gNB-DU, to: gNB-CU, message: F1AP Setup Response, precond: gNB-DU sends an F1AP Setup Response (potentially due to an error or retransmission logic)., postcond: gNB-CU receives an unexpected F1AP Setup Response.",
+          "state_machine.transitions[3]: from: F1AP_UP, to: RECEIVING_UNEXPECTED_F1AP_RESPONSE, on: F1AP Setup Response (from DU), guard: Message received from DU while F1AP_UP (Indicates no pending request from CU for this response).",
+          "snippets[0]: slice_1_F1AP_Setup_Procedure.md (The specification defines the F1AP Setup Request/Response as a DU-initiated request followed by a CU-initiated response)."
+        ]
+      },
+      {
+        "name": "F1AP Message ID Binding",
+        "result": "UNKNOWN",
+        "evidence": [
+          "bug_card.key_ids: {'rnti': 'incorrect value'} (RNTI is not directly relevant for F1AP Setup, and no specific F1AP ID issue is identified for the crashing message).",
+          "sequence_diagram[3]: gNB-CU crashes during decoding or handling of the message (Suggests potential message content issues, which could include IDs, but no specific ID binding failure is confirmed).",
+          "snippets[5]: decode_f1ap_setup_response: ...responsible for decoding the incoming message, making it a critical point for potential parsing errors or malformed messages (Could involve IDs, but not specified)."
+        ]
+      },
+      {
+        "name": "F1AP Setup Transaction Scoping",
+        "result": "FAIL",
+        "evidence": [
+          "state_machine.transitions[3]: from: F1AP_UP, to: RECEIVING_UNEXPECTED_F1AP_RESPONSE, on: F1AP Setup Response (from DU), guard: Message received from DU while F1AP_UP (The F1AP Setup transaction should be complete when the CU is in F1AP_UP state).",
+          "sequence_diagram[2]: gNB-CU receives an unexpected F1AP Setup Response (Implies the message is outside the expected transaction flow).",
+          "snippets[0]: slice_1_F1AP_Setup_Procedure.md (The specification outlines a single F1AP Setup transaction)."
+        ]
+      },
+      {
+        "name": "No Pending F1AP Setup Request",
         "result": "PASS",
         "evidence": [
-          "openair2/F1AP/f1ap_handlers.c:36:1: {CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}, /* F1Setup */",
-          "slice_1_F1AP_Setup_Procedure.md: The F1AP Setup procedure is used to establish the F1 interface between a gNB-CU and a gNB-DU. This procedure involves the exchange of F1 Setup Request and F1 Setup Response messages to convey configuration information and establish the necessary F1AP signalling connection."
+          "state_machine.states: F1AP_UP (The CU is in an operational state, not having a pending F1AP Setup Request of its own).",
+          "The bug describes the CU *receiving* an unexpected response, not initiating a new request while one is pending."
         ]
       },
       {
-        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
+        "name": "F1AP Setup Timer Preconditions",
         "result": "UNKNOWN",
-        "evidence": []
-      },
-      {
-        "name": "Transaction scoping (TransactionID)",
-        "result": "PASS",
         "evidence": [
-          "openair2/F1AP/lib/f1ap_interface_management.c:647:1: case F1AP_ProtocolIE_ID_id_TransactionID: // Transaction ID (M) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_TransactionID); AssertError(ie->value.choice.TransactionID != -1, return false, \"ie->value.choice.TransactionID is -1\"); out->transaction_id = ie->value.choice.TransactionID; break;"
+          "sequence_diagram[2]: gNB-DU sends an F1AP Setup Response (potentially due to an error or retransmission logic) (Suggests DU's action might be timer-related, but not the CU's crash).",
+          "No specific timer preconditions are identified for the gNB-CU's crash during decoding."
         ]
-      },
-      {
-        "name": "No-pending-request on new request",
-        "result": "UNKNOWN",
-        "evidence": []
-      },
-      {
-        "name": "Timer preconditions",
-        "result": "UNKNOWN",
-        "evidence": []
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The `f1ap_messages_processing` table in `openair2/F1AP/f1ap_handlers.c` is responsible for dispatching incoming F1AP messages to the correct handler function based on the procedure code and message direction. For the `F1Setup` procedure, the table entry is `{CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}`. The `F1AP Setup Response` is a 'Successful outcome' message, which corresponds to the second element in this array. Therefore, when the gNB-CU receives an `F1AP Setup Response`, the `f1ap_handle_message` function incorrectly dispatches it to `DU_handle_F1_SETUP_RESPONSE`. This function, as seen in `openair2/F1AP/f1ap_du_interface_management.c`, contains logic specific to the gNB-DU. Executing DU-specific logic within the gNB-CU context upon receiving an F1AP Setup Response leads to a crash, as described in the observed behavior. The gNB-CU should instead have its own handler (e.g., `CU_handle_F1_SETUP_RESPONSE`, which is declared in `f1ap_cu_interface_management.h` but not correctly mapped for incoming messages) to process the F1AP Setup Response."
+    "rationale": "The gNB-CU crashes when receiving an F1AP Setup Response from the gNB-DU. This message is unexpected as the F1AP Setup Response should be sent by the CU to the DU, and the CU is likely already in an F1AP_UP state. The crash occurs during the decoding process of this unexpected message, indicating a lack of robustness in the gNB-CU's F1AP message handling implementation. While the DU might be sending an erroneous or out-of-sequence message, the CU's implementation should be able to handle such scenarios gracefully (e.g., by discarding the message or logging an error) rather than crashing. This points to a defect in the CU's software rather than a direct violation of a specification by the CU's intended behavior."
   },
   "step7": {
     "evidence_pack": {
@@ -304,45 +386,43 @@
         "slice_1_F1AP_Setup_Procedure.md"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_handlers.c:36:1",
-        "openair2/F1AP/f1ap_du_interface_management.c:106:1",
-        "openair2/F1AP/f1ap_cu_interface_management.h:26:1",
-        "openair2/F1AP/f1ap_cu_task.c:30:1",
-        "openair2/F1AP/lib/f1ap_interface_management.c:647:1"
+        "openair2/F1AP/lib/f1ap_interface_management.c:decode_f1ap_setup_response",
+        "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_RESPONSE",
+        "openair2/F1AP/f1ap_du_interface_management.c:DU_send_F1_SETUP_RESPONSE"
       ],
-      "expected_vs_observed": "The F1AP specification and the `f1ap_messages_processing` table in `f1ap_handlers.c` indicate that the F1AP Setup procedure is initiated by the gNB-CU with an F1AP Setup Request, and the gNB-DU responds with an F1AP Setup Response. Consequently, the gNB-DU is expected to handle the reception of an F1AP Setup Response, as confirmed by `DU_handle_F1_SETUP_RESPONSE` in `f1ap_du_interface_management.c`. The `F1AP_CU_task` in `f1ap_cu_task.c` also shows the CU's role is to *send* the F1AP Setup Response. However, the observed behavior is that the gNB-CU crashes when it *receives* an F1AP Setup Response, which is contrary to the defined message flow and handler assignments."
+      "expected_vs_observed": "The F1AP specification dictates that an F1AP Setup Response is sent from the gNB-CU to the gNB-DU, typically in response to an F1AP Setup Request from the DU, and within a single, well-defined transaction. However, the observed behavior is that the gNB-CU crashes upon receiving an F1AP Setup Response from the gNB-DU, specifically when the CU is already in an operational F1AP_UP state, indicating that this message is unexpected in terms of its directionality, pairing, and transaction context, potentially leading to a decoding or handling error."
     }
   },
   "step8": {
     "report": {
-      "verdict": "implementation-bug",
-      "rationale": "The gNB-CU is crashing upon receiving an F1AP Setup Response. According to the F1AP specification and the `f1ap_messages_processing` table, the F1AP Setup procedure is initiated by the gNB-CU (sending F1AP Setup Request) and responded to by the gNB-DU (sending F1AP Setup Response). Therefore, the gNB-CU should not be receiving an F1AP Setup Response. The `DU_handle_F1_SETUP_RESPONSE` function is correctly assigned to the DU, indicating the DU is expected to handle this message. The CU's crash on receiving this message suggests an incorrect message routing or handling logic within the CU, where it's attempting to process a message intended for the DU or a message it should not be receiving in this context.",
+      "verdict": "spec-nonconformance",
+      "rationale": "The gNB-CU crashes upon receiving an F1AP Setup Response from the gNB-DU. According to the F1AP specification, the F1AP Setup Response is a message sent from the gNB-CU to the gNB-DU, typically in response to an F1AP Setup Request from the DU. The observed message is therefore unexpected in terms of its directionality, pairing, and transaction context, as the CU is already in an F1AP_UP state. This indicates a non-conformance by the gNB-DU in sending this message, and a potential robustness issue (implementation bug) in the gNB-CU's handling of unexpected or malformed F1AP messages, leading to a crash during decoding or handling.",
       "citations": {
         "spec": [
           "slice_1_F1AP_Setup_Procedure.md"
         ],
         "code": [
-          "openair2/F1AP/f1ap_handlers.c:36:1",
-          "openair2/F1AP/f1ap_du_interface_management.c:106:1",
-          "openair2/F1AP/f1ap_cu_interface_management.h:26:1",
-          "openair2/F1AP/f1ap_cu_task.c:30:1"
+          "openair2/F1AP/lib/f1ap_interface_management.c:decode_f1ap_setup_response",
+          "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_RESPONSE",
+          "openair2/F1AP/f1ap_du_interface_management.c:DU_send_F1_SETUP_RESPONSE"
         ]
       },
       "suggested_repro": [
-        "Initiate an F1AP Setup procedure where the gNB-CU sends an F1AP Setup Request to the gNB-DU.",
-        "Configure the gNB-DU to send an F1AP Setup Response back to the gNB-CU.",
-        "Observe the gNB-CU crashing upon reception of the F1AP Setup Response."
+        "1. Establish an F1AP connection between gNB-CU and gNB-DU, reaching the F1AP_UP state.",
+        "2. From the gNB-DU, send an F1AP Setup Response message to the gNB-CU.",
+        "3. Observe the gNB-CU for a crash or unexpected behavior."
       ],
       "risks": [
-        "Service Interruption: The gNB-CU crashing prevents the establishment of the F1 interface, leading to a complete inability to connect DUs and serve UEs.",
-        "Deployment Failure: New gNB-DU deployments or reconfigurations requiring F1AP Setup will fail.",
-        "Resource Wastage: Repeated crashes and restarts of the gNB-CU consume system resources and operational effort."
+        "Network instability due to gNB-CU crashes.",
+        "Service disruption for UEs served by the crashing gNB-CU.",
+        "Interoperability issues with non-conforming DUs.",
+        "Security vulnerability if unexpected messages can trigger crashes."
       ],
       "next_steps": [
-        "Investigate the F1AP message routing and handling logic within the gNB-CU to determine why it is receiving and attempting to process an F1AP Setup Response.",
-        "Verify the `f1ap_messages_processing` table and associated handler assignments for the gNB-CU to ensure correct message dispatch.",
-        "Implement a check in the gNB-CU to gracefully handle unexpected F1AP messages, logging an error instead of crashing.",
-        "Review the F1AP Setup procedure implementation in both gNB-CU and gNB-DU to ensure strict adherence to the F1AP specification regarding message directionality."
+        "1. Investigate the gNB-DU's logic for sending F1AP Setup Response messages to identify why it sends this message in an incorrect context/direction.",
+        "2. Enhance gNB-CU's F1AP message handling to gracefully reject or log unexpected F1AP Setup Response messages from the DU without crashing.",
+        "3. Implement robust error handling and validation in decode_f1ap_setup_response and CU_handle_F1_SETUP_RESPONSE to prevent crashes from malformed or out-of-context messages.",
+        "4. Add logging for unexpected F1AP messages to aid future debugging."
       ]
     }
   }
