@@ -49,7 +49,17 @@ def expand_fetch_requests(repo_root: Path, fetch_requests: list) -> list[str]:
         if not pattern:
             continue
         max_files = int(req.get("max_files") or 10)
-        suffixes = set(req.get("suffix") or [])
+        # suffixes = set(req.get("suffix") or [])
+        raw_suffixes = req.get("suffix") or []
+        suffixes = set()
+        for s in raw_suffixes:
+            if not s:
+                continue
+            s = s.strip().lower()
+            if not s.startswith("."):
+                s = "." + s
+            suffixes.add(s)
+        
         # allow absolute/user directory or relative repo_root 
         if pattern.startswith(("/", "~")):
             candidates = glob.glob(os.path.expanduser(pattern), recursive=True)
@@ -220,7 +230,8 @@ def write_code_tree_file(
         raise FileNotFoundError(f"repo_root not found: {repo_root}")
 
     if out_path is None:
-        out_path = repo_root / "__code_tree.txt"
+        # out_path = repo_root / "__code_tree.txt"
+        out_path = repo_root.parent / f"{repo_root.name}__code_tree.txt"
 
     sufset = {s.lower() for s in include_suffixes} if include_suffixes else None
 
