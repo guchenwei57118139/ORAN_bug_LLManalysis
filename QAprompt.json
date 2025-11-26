@@ -85,9 +85,9 @@
             "properties": { "name": { "type": "string" }, "mime_type": { "type": "string" } } },
             "minItems": 1
           }
-        }          
+        }
       },
-      "llm_prompt_template": "You are SpecIndexer.\n\nInputs you will receive:\n1. BUG_CARD: A structured description of the bug, including procedure_guess, key_ids, interface_guess, signals_or_timers, and a summary of the issue.\n2. SPEC_TOC: Metadata describing the spec slice file(s). The actual specification content will be provided to you as attached markdown files by the caller.\n\nYour job:\nUsing BUG_CARD together with the attached spec slices (markdown files), identify the 3–6 most relevant specification sections governing the bug. These sections may relate to: procedures (e.g., UE Context Modification / Setup / Release), message structures, ID consistency behavior (CU-UE-ID, DU-UE-ID), error handling or abnormal cases, expected state transitions and constraints.\n\nFor each section, produce:\n- \"Keywords\": Short strings used for searching source code (e.g., procedure names, message names, IE names, identifier fields, timers, error types).\n- \"title\": An array of strings representing the section’s conceptual heading (split into tokens, e.g., [\"5.4.1\", \"UE CONTEXT MODIFICATION\"]).\n\nAdditionally:\nSummarize \"expected_behaviour\": a concise description of what the spec states should happen in normal operation and in abnormal scenarios related to the bug (e.g., ID mismatch handling, validation, state machine constraints).\n\nImportant rules:\n- Treat the attached markdown spec slices as ground-truth specification text. Do not hallucinate spec content.\n- Infer which procedures or identifiers are relevant from BUG_CARD, then match them against the attached spec slices.\n- Ensure all output strictly conforms to output_schema.\n\nProduce only valid JSON. No commentary or explanation.",
+      "llm_prompt_template": "You are SpecIndexer. You will receive a spec table of contents/headings via the API in SPEC_TOC and MUST read it as ground truth.\nFile: \n{{name}} ({{mime_type}})\nFrom BUG_CARD and SPEC_TOC, pick 3–6 most relevant sections (procedures, timers, message definitions) by listing some keywords. Also, list the related headings to the TITlE. Return JSON per output_schema.",
       "output_schema": {
         "type": "object",
         "required": ["candidate_spec_sections","expected_behaviour"],
@@ -124,12 +124,14 @@
               "known_keywords": { "type": "array", "$ref": "#/steps/2/output_schema/properties/candidate_spec_sections/properties/Keywords" }
             }
           }
-        }
+        },
+          "iteration": { "type": "integer", "minimum": 0, "default": 0 },
+          "max_iters": { "type": "integer", "minimum": 1, "default": 3 }
       },
-      "llm_prompt_template": "You are CodeLocator. Build a prioritized list of files/functions to fetch. Use interface names, procedure/timer, keywords. Plan recursion if initial fetch seems insufficient. Return JSON per output_schema.",
+      "llm_prompt_template": "You are CodeLocator. Build a prioritized list of files/functions to fetch according to the code tree file. Use interface names, procedure/timer, keywords. Plan recursion if initial fetch seems insufficient, and propose additional fetch_requests. Return JSON per output_schema.",
       "output_schema": {
         "type": "object",
-        "required": ["candidate_code"],
+        "required": ["candidate_code","control"],
         "properties": {
           "candidate_code": {
             "type": "array",
@@ -137,6 +139,25 @@
               "type": "object",
               "required": ["path", "function_name", "reason"],
               "properties": { "path": { "type": "string" }, "function_name": { "type": "string" }, "reason": { "type": "string" } }
+            }
+          },
+          "control": {
+            "type": "object",
+            "required": ["decision"],
+            "properties": {
+              "decision": { "type": "string", "enum": ["stop", "continue"] },
+              "fetch_requests": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["pattern"],
+                  "properties": {
+                    "pattern": { "type": "string", "description": "glob or regex or path hint, e.g., openair2/**/F1*.c" },
+                    "suffix": { "type": "array", "items": { "type": "string" }, "description": "file extensions whitelist" },
+                    "max_files": { "type": "integer", "minimum": 1, "default": 10 }
+                  }
+                }
+              }
             }
           }
         }
@@ -163,12 +184,11 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["source", "location", "text", "kind"],
+              "required": ["source", "location", "kind"],
               "properties": {
                 "kind": { "type": "string", "enum": ["spec", "code"] },
                 "source": { "type": "string" },
-                "location": { "type": "string" },
-                "text": { "type": "string" }
+                "location": { "type": "string" }
               }
             }
           }
@@ -190,7 +210,7 @@
       "llm_prompt_template": "You are SketchMaker. Build (1) an expected message sequence as ordered events with {from,to,message,precond,postcond} and (2) a compact state machine (5–8 states, transitions with guards). Note assumptions and open questions. Return JSON per output_schema.",
       "output_schema": {
         "type": "object",
-        "required": ["sequence_diagram", "state_machine", "assumptions", "questions", "review_request"],
+        "required": ["sequence_diagram", "state_machine", "assumptions", "questions"],
         "properties": {
           "sequence_diagram": {
             "type": "array",
@@ -208,8 +228,7 @@
             }
           },
           "assumptions": { "type": "array", "items": { "type": "string" } },
-          "questions": { "type": "array", "items": { "type": "string" } },
-          "review_request": { "type": "string", "enum": ["HumanInLoop_B_required"] }
+          "questions": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
