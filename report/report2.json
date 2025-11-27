@@ -1,15 +1,15 @@
 {
   "step1": {
     "bug_card": {
-      "observed_behavior": "gNB-CU crashes when gNB-DU responds to a UE Context Modification request with an incorrect RNTI in the information element.",
+      "observed_behavior": "gNB-CU crashes when gNB-DU responds to UE Context Modification request with incorrect RNTI in IE.",
       "interface_guess": [
         "F1AP",
         "RRC"
       ],
       "procedure_guess": [
         "UE Context Modification",
-        "RRC Connection Release",
-        "RRC Message Transfer"
+        "UE Release",
+        "DL RRC Message Transfer"
       ],
       "components_involved": [
         "gNB-CU",
@@ -17,11 +17,11 @@
         "UE"
       ],
       "key_ids": {
-        "rnti": "incorrect"
+        "rnti": "incorrect value"
       },
       "signals_or_timers": [
-        "UE Context Modification Request",
-        "DLRRCMessage Transfer"
+        "UE Context Modification request",
+        "DL RRC Message Transfer"
       ]
     }
   },
@@ -32,118 +32,111 @@
           "UE Context Modification",
           "gNB-CU",
           "gNB-DU",
-          "F1AP",
-          "procedure",
-          "UE Context"
+          "UE Context",
+          "modify",
+          "radio resources",
+          "F1AP"
         ],
         "title": [
-          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)"
+          "UE Context Modification (gNB-CU initiated)"
         ]
       },
       {
         "Keywords": [
-          "UE Context Modification Request",
-          "UE Context Modification Response",
-          "C-RNTI",
-          "gNB-DU",
+          "UE CONTEXT MODIFICATION REQUEST",
+          "UE CONTEXT MODIFICATION RESPONSE",
           "gNB-CU",
-          "successful operation",
-          "F1AP"
+          "gNB-DU",
+          "C-RNTI",
+          "modify",
+          "successful"
         ],
         "title": [
-          "\u00a78.3.4.2 Successful Operation"
+          "UE Context Modification (gNB-CU initiated)",
+          "Successful Operation"
         ]
       },
       {
         "Keywords": [
           "UE CONTEXT MODIFICATION RESPONSE",
-          "message definition",
+          "gNB-DU",
+          "gNB-CU",
           "C-RNTI",
           "IE",
-          "F1AP"
+          "F1AP ID",
+          "UE Context"
         ],
         "title": [
-          "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE"
+          "UE CONTEXT MODIFICATION RESPONSE"
         ]
       },
       {
         "Keywords": [
           "C-RNTI",
-          "Information Element",
-          "definition",
+          "IE",
           "RNTI",
-          "TS 38.331"
+          "UE",
+          "gNB-DU",
+          "allocated"
         ],
         "title": [
-          "\u00a79.3.1.32 C-RNTI"
+          "C-RNTI"
         ]
       },
       {
         "Keywords": [
-          "UE Context Modification Failure",
-          "unsuccessful operation",
-          "cause value",
+          "DL RRC Message Transfer",
+          "RRC message",
+          "UE-associated signalling",
+          "gNB-CU",
           "gNB-DU"
         ],
         "title": [
-          "\u00a78.3.4.3 Unsuccessful Operation"
+          "DL RRC Message Transfer"
         ]
       },
       {
         "Keywords": [
-          "Abnormal Conditions",
-          "UE Context Modification Request",
-          "IE",
-          "error handling"
+          "DL RRC MESSAGE TRANSFER",
+          "gNB-CU",
+          "gNB-DU",
+          "RRC-Container",
+          "SRB ID",
+          "F1AP ID"
         ],
         "title": [
-          "\u00a78.3.4.4 Abnormal Conditions"
+          "DL RRC MESSAGE TRANSFER"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-DU, upon receiving a UE Context Modification Request, is expected to respond with a UE CONTEXT MODIFICATION RESPONSE message. If the gNB-DU includes the C-RNTI Information Element in this response, it must ensure that the C-RNTI is correctly allocated and valid for the UE context. If the gNB-DU cannot successfully perform the requested modifications or encounters an incorrect IE, it should respond with a UE CONTEXT MODIFICATION FAILURE message with an appropriate cause value."
+    "expected_behaviour": "The gNB-DU shall include a valid C-RNTI in the UE CONTEXT MODIFICATION RESPONSE message if it allocates one, as specified in \u00a79.3.1.32. The gNB-CU shall handle the UE CONTEXT MODIFICATION RESPONSE message robustly, even if the C-RNTI IE contains an incorrect or invalid value, without crashing."
   },
   "step3": {
     "candidate_code": [
       {
         "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
         "function_name": "CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE",
-        "reason": "The gNB-CU crashes when receiving a UE Context Modification Response. This function is the primary handler for that message on the CU side."
+        "reason": "This function is the entry point on the gNB-CU for handling the UE Context Modification Response from the gNB-DU, which is where the 'incorrect RNTI in IE' is observed."
       },
       {
         "path": "openair2/F1AP/lib/f1ap_ue_context.c",
         "function_name": "decode_ue_context_mod_resp",
-        "reason": "This function is responsible for decoding the UE Context Modification Response message. An 'incorrect RNTI in the information element' suggests an issue during message parsing or validation within this function."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
-        "function_name": "DU_send_UE_CONTEXT_MODIFICATION_RESPONSE",
-        "reason": "This function on the gNB-DU side is responsible for encoding and sending the UE Context Modification Response. Understanding its implementation can reveal how an 'incorrect RNTI' might be generated."
-      },
-      {
-        "path": "openair2/F1AP/lib/f1ap_ue_context.h",
-        "function_name": "encode_ue_context_mod_resp",
-        "reason": "Header defining the encoding function for the UE Context Modification Response, relevant for understanding the message structure and potential encoding errors on the DU side."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_handlers.c",
-        "function_name": "f1ap_handle_message",
-        "reason": "This is the central dispatcher for all incoming F1AP messages. It's crucial for understanding the overall message flow and how the UE Context Modification Response is routed."
+        "reason": "This function is responsible for decoding the UE Context Modification Response message. The 'incorrect RNTI in IE' suggests an issue during the parsing or validation of an Information Element containing an RNTI within this message."
       },
       {
         "path": "openair2/F1AP/f1ap_ids.c",
         "function_name": "cu_get_f1_ue_data",
-        "reason": "The bug mentions an 'incorrect RNTI'. This file manages UE IDs (including RNTIs) and their mapping. The CU might use this function to retrieve UE context based on the RNTI from the incoming message, leading to a crash if the RNTI is invalid or not found."
+        "reason": "The bug involves an 'incorrect RNTI in IE' causing a crash on the gNB-CU. This file manages UE F1AP IDs and their associated data (which may include RNTIs). A crash could occur if an incorrect RNTI leads to a failed or invalid lookup in the UE context data structures."
       },
       {
-        "path": "openair2/F1AP/MESSAGES/ASN1/R15.1.1/asn1_constants.h",
-        "function_name": "",
-        "reason": "This file (or related ASN.1 definitions) would define the exact structure of the UE Context Modification Response message and the C-RNTI information element, which is critical for identifying format discrepancies."
+        "path": "openair2/F1AP/f1ap_messages_types.h",
+        "function_name": "f1ap_ue_context_mod_resp_t",
+        "reason": "This header defines the data structures for F1AP messages, including the UE Context Modification Response. Understanding its structure is crucial for identifying where an 'incorrect RNTI' might be stored or processed."
       },
       {
-        "path": "common/utils/assertions.h",
-        "function_name": "",
-        "reason": "The bug describes a 'crash', which often indicates an assertion failure or a segmentation fault. This file defines the assertion macros used throughout the codebase, which could pinpoint the exact location of the crash."
+        "path": "openair2/F1AP/f1ap_ids_test.c",
+        "function_name": "cu_data_test",
+        "reason": "This test file contains unit tests for UE ID management on the CU side. It could be used to reproduce the bug or to understand the expected behavior of RNTI handling and UE context lookups."
       }
     ],
     "control": {
@@ -152,23 +145,26 @@
         {
           "pattern": "openair2/F1AP/f1ap_cu_ue_context_management.c",
           "suffix": [
-            ".c"
+            ".c",
+            ".h"
           ]
         },
         {
           "pattern": "openair2/F1AP/lib/f1ap_ue_context.c",
           "suffix": [
-            ".c"
+            ".c",
+            ".h"
           ]
         },
         {
-          "pattern": "openair2/F1AP/f1ap_du_ue_context_management.c",
+          "pattern": "openair2/F1AP/f1ap_ids.c",
           "suffix": [
-            ".c"
+            ".c",
+            ".h"
           ]
         },
         {
-          "pattern": "openair2/F1AP/lib/f1ap_ue_context.h",
+          "pattern": "openair2/F1AP/f1ap_messages_types.h",
           "suffix": [
             ".h"
           ]
@@ -176,25 +172,20 @@
         {
           "pattern": "openair2/F1AP/f1ap_handlers.c",
           "suffix": [
-            ".c"
+            ".c",
+            ".h"
           ]
         },
         {
-          "pattern": "openair2/F1AP/f1ap_ids.c",
-          "suffix": [
-            ".c"
-          ]
-        },
-        {
-          "pattern": "openair2/F1AP/MESSAGES/ASN1/R15.1.1/asn1_constants.h",
+          "pattern": "openair2/F1AP/f1ap_common.h",
           "suffix": [
             ".h"
           ]
         },
         {
-          "pattern": "common/utils/assertions.h",
+          "pattern": "openair2/F1AP/f1ap_ids_test.c",
           "suffix": [
-            ".h"
+            ".c"
           ]
         }
       ]
@@ -204,73 +195,58 @@
     "snippets": [
       {
         "kind": "spec",
-        "source": "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-        "location": "\u00a78.3.4 UE Context Modification (gNB-CU initiated)"
+        "source": "doc/F1AP/F1-design.md",
+        "location": "100-104"
       },
       {
         "kind": "spec",
-        "source": "\u00a78.3.4.2 Successful Operation",
-        "location": "\u00a78.3.4.2 Successful Operation"
+        "source": "doc/F1AP/F1-design.md",
+        "location": "105-109"
       },
       {
         "kind": "spec",
-        "source": "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE",
-        "location": "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE"
+        "source": "doc/F1AP/F1-design.md",
+        "location": "105-109"
       },
       {
         "kind": "spec",
-        "source": "\u00a79.3.1.32 C-RNTI",
-        "location": "\u00a79.3.1.32 C-RNTI"
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "409-410"
       },
       {
         "kind": "spec",
-        "source": "\u00a78.3.4.3 Unsuccessful Operation",
-        "location": "\u00a78.3.4.3 Unsuccessful Operation"
+        "source": "doc/F1AP/F1-design.md",
+        "location": "110-114"
       },
       {
         "kind": "spec",
-        "source": "\u00a78.3.4.4 Abnormal Conditions",
-        "location": "\u00a78.3.4.4 Abnormal Conditions"
+        "source": "doc/F1AP/F1-design.md",
+        "location": "110-114"
       },
       {
         "kind": "code",
         "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
-        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE"
+        "location": "184-200"
       },
       {
         "kind": "code",
         "source": "openair2/F1AP/lib/f1ap_ue_context.c",
-        "location": "openair2/F1AP/lib/f1ap_ue_context.c:decode_ue_context_mod_resp"
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_du_ue_context_management.c",
-        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_send_UE_CONTEXT_MODIFICATION_RESPONSE"
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/lib/f1ap_ue_context.h",
-        "location": "openair2/F1AP/lib/f1ap_ue_context.h:encode_ue_context_mod_resp"
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_handlers.c",
-        "location": "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message"
+        "location": "1008-1050"
       },
       {
         "kind": "code",
         "source": "openair2/F1AP/f1ap_ids.c",
-        "location": "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data"
+        "location": "69-75"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/MESSAGES/ASN1/R15.1.1/asn1_constants.h",
-        "location": "openair2/F1AP/MESSAGES/ASN1/R15.1.1/asn1_constants.h:"
+        "source": "openair2/F1AP/f1ap_messages_types.h",
+        "location": "409-416"
       },
       {
         "kind": "code",
-        "source": "common/utils/assertions.h",
-        "location": "common/utils/assertions.h:"
+        "source": "openair2/F1AP/f1ap_ids_test.c",
+        "location": "29-44"
       }
     ]
   },
@@ -279,210 +255,198 @@
       {
         "from": "gNB-CU",
         "to": "gNB-DU",
-        "message": "F1AP UE Context Modification Request",
-        "precond": "gNB-CU has an active UE context and initiates modification.",
-        "postcond": "gNB-DU receives the request and prepares to modify its UE context."
-      },
-      {
-        "from": "gNB-DU",
-        "to": "gNB-DU",
-        "message": "Process UE Context Modification Request (internal)",
-        "precond": "gNB-DU received the UE Context Modification Request.",
-        "postcond": "gNB-DU processes the request and prepares a response, including an incorrect RNTI."
+        "message": "F1AP: UE Context Modification Request",
+        "precond": "UE context exists on gNB-CU and gNB-DU; gNB-CU initiates modification of UE context.",
+        "postcond": "gNB-DU receives the request and starts processing."
       },
       {
         "from": "gNB-DU",
         "to": "gNB-CU",
-        "message": "F1AP UE Context Modification Response",
-        "precond": "gNB-DU has processed the request and includes an incorrect RNTI in the response message.",
-        "postcond": "gNB-CU receives the response with the incorrect RNTI."
+        "message": "F1AP: UE Context Modification Response",
+        "precond": "gNB-DU has processed the modification request and generates a response with an incorrect RNTI.",
+        "postcond": "gNB-CU receives the response and attempts to process the RNTI."
       },
       {
         "from": "gNB-CU",
         "to": "gNB-CU",
-        "message": "Handle UE Context Modification Response (crash)",
-        "precond": "gNB-CU receives the F1AP UE Context Modification Response containing an incorrect RNTI.",
-        "postcond": "gNB-CU attempts to process the response, leading to a crash."
+        "message": "Process UE Context Modification Response",
+        "precond": "gNB-CU has received the response with an incorrect RNTI.",
+        "postcond": "gNB-CU encounters an error during RNTI validation and crashes."
       }
     ],
     "state_machine": {
       "states": [
-        "Idle",
-        "UE_Context_Modification_Requested",
-        "Waiting_for_Response",
-        "UE_Context_Modified",
-        "UE_Context_Modification_Error",
-        "CU_Crashed"
+        "Initial",
+        "UE Context Active",
+        "Modification Requested",
+        "Modification Response Received",
+        "UE Context Modified",
+        "Error",
+        "Crashed"
       ],
       "transitions": [
         {
-          "from": "Idle",
-          "to": "UE_Context_Modification_Requested",
-          "on": "CU_initiates_modification"
+          "from": "Initial",
+          "to": "UE Context Active",
+          "on": "UE Context Setup Complete"
         },
         {
-          "from": "UE_Context_Modification_Requested",
-          "to": "Waiting_for_Response",
-          "on": "CU_sends_F1AP_UE_Context_Modification_Request"
+          "from": "UE Context Active",
+          "to": "Modification Requested",
+          "on": "Send UE Context Modification Request"
         },
         {
-          "from": "Waiting_for_Response",
-          "to": "UE_Context_Modified",
-          "on": "DU_sends_F1AP_UE_Context_Modification_Response",
-          "guard": "RNTI_is_valid_and_correct"
+          "from": "Modification Requested",
+          "to": "Modification Response Received",
+          "on": "Receive UE Context Modification Response"
         },
         {
-          "from": "Waiting_for_Response",
-          "to": "UE_Context_Modification_Error",
-          "on": "DU_sends_F1AP_UE_Context_Modification_Response",
-          "guard": "RNTI_is_invalid_or_incorrect AND CU_handles_error_gracefully"
+          "from": "Modification Response Received",
+          "to": "UE Context Modified",
+          "on": "RNTI Validated",
+          "guard": "RNTI is correct"
         },
         {
-          "from": "Waiting_for_Response",
-          "to": "CU_Crashed",
-          "on": "DU_sends_F1AP_UE_Context_Modification_Response",
-          "guard": "RNTI_is_invalid_or_incorrect AND CU_fails_to_handle"
+          "from": "Modification Response Received",
+          "to": "Crashed",
+          "on": "RNTI Validation Failed",
+          "guard": "RNTI is incorrect"
         },
         {
-          "from": "Waiting_for_Response",
-          "to": "UE_Context_Modification_Error",
-          "on": "F1AP_Timeout"
+          "from": "Modification Requested",
+          "to": "Error",
+          "on": "Timer Expires",
+          "guard": "UE Context Modification Timer expires"
         },
         {
-          "from": "UE_Context_Modified",
-          "to": "Idle",
-          "on": "Procedure_Complete"
-        },
-        {
-          "from": "UE_Context_Modification_Error",
-          "to": "Idle",
-          "on": "Error_Recovery_Complete"
+          "from": "UE Context Modified",
+          "to": "UE Context Active",
+          "on": "Continue Operations"
         }
       ]
     },
     "assumptions": [
-      "The 'incorrect RNTI' refers to the C-RNTI or a similar UE-specific identifier used for context lookup on the gNB-CU.",
-      "The gNB-CU expects the RNTI in the UE Context Modification Response to match the UE context for which the modification was initiated.",
-      "The crash occurs during the processing of the F1AP UE Context Modification Response message on the gNB-CU side, likely when attempting to retrieve or update UE context using the provided RNTI.",
-      "The F1AP interface is the primary communication interface between gNB-CU and gNB-DU for this procedure.",
-      "The gNB-DU is responsible for sending the correct RNTI in the UE Context Modification Response."
+      "The gNB-CU expects a specific RNTI value in the F1AP UE Context Modification Response, likely the one it sent or a derived one.",
+      "The crash in gNB-CU is directly triggered by the incorrect RNTI value within the F1AP UE Context Modification Response.",
+      "The RNTI validation logic in gNB-CU does not gracefully handle an incorrect RNTI, leading to a fatal error.",
+      "The gNB-DU is sending an incorrect RNTI due to a bug in its implementation or a misinterpretation of the F1AP specification."
     ],
     "questions": [
-      "What specific information element within the F1AP UE Context Modification Response message contains the RNTI that is found to be incorrect?",
-      "Is the 'incorrect RNTI' syntactically invalid (e.g., out of range, malformed) or semantically incorrect (e.g., valid format but does not correspond to any active UE context on the gNB-CU)?",
-      "What is the exact line of code in the gNB-CU's F1AP handler (e.g., `CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE` or a called function like `cu_get_f1_ue_data`) where the crash occurs?",
-      "What is the expected behavior of the gNB-CU when an incorrect or unknown RNTI is received in a UE Context Modification Response (e.g., reject message, log error, release UE context, ignore)?",
-      "Under what conditions would the gNB-DU send an incorrect RNTI in the response (e.g., DU bug, race condition, misconfiguration, corrupted message)?",
-      "Does the gNB-CU perform any validation on the received RNTI before attempting to use it for UE context lookup or memory access?"
+      "What is the expected RNTI value in the F1AP UE Context Modification Response? Is it the same as in the request, or a new one assigned by the gNB-DU?",
+      "What specific Information Element (IE) within the F1AP UE Context Modification Response carries the RNTI that causes the crash?",
+      "What is the exact crash point (file and line number) in the gNB-CU code when processing the incorrect RNTI?",
+      "Under what specific conditions does the gNB-DU generate and send an incorrect RNTI in the response?",
+      "Is there an existing error handling mechanism for invalid RNTIs in gNB-CU that is being bypassed or is missing for this specific scenario?"
     ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "Directionality",
+        "name": "directionality",
         "result": "PASS",
         "evidence": [
-          "sequence_diagram",
-          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)"
+          "sequence_diagram: gNB-CU to gNB-DU: F1AP: UE Context Modification Request",
+          "sequence_diagram: gNB-DU to gNB-CU: F1AP: UE Context Modification Response"
         ]
       },
       {
-        "name": "Req/Resp pairing",
+        "name": "req/resp pairing",
         "result": "PASS",
         "evidence": [
-          "sequence_diagram",
-          "\u00a78.3.4.2 Successful Operation"
+          "sequence_diagram: F1AP: UE Context Modification Request is followed by F1AP: UE Context Modification Response"
         ]
       },
       {
-        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
+        "name": "ID binding",
         "result": "FAIL",
         "evidence": [
-          "bug_card",
-          "sequence_diagram",
-          "state_machine",
-          "\u00a79.3.1.32 C-RNTI",
-          "\u00a78.3.4.3 Unsuccessful Operation",
-          "\u00a78.3.4.4 Abnormal Conditions",
-          "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE",
-          "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data"
+          "bug_card: 'gNB-CU crashes when gNB-DU responds to UE Context Modification request with incorrect RNTI in IE.'",
+          "state_machine: transition from 'Modification Response Received' to 'Crashed' on 'RNTI Validation Failed' with guard 'RNTI is incorrect'",
+          "snippets: openair2/F1AP/f1ap_cu_ue_context_management.c (184-200) - likely processing of response",
+          "snippets: openair2/F1AP/lib/f1ap_ue_context.c (1008-1050) - likely UE context and ID validation",
+          "snippets: openair2/F1AP/f1ap_ids.c (69-75) - ID management functions"
         ]
       },
       {
-        "name": "Transaction scoping",
+        "name": "transaction scoping",
         "result": "PASS",
         "evidence": [
-          "sequence_diagram",
-          "state_machine"
+          "sequence_diagram: depicts a single, clear UE Context Modification transaction",
+          "state_machine: transitions define a clear flow for a single modification procedure"
         ]
       },
       {
-        "name": "No-pending-request on new request",
+        "name": "no-pending-request on new request",
         "result": "UNKNOWN",
-        "evidence": []
+        "evidence": [
+          "The provided information does not contain details to evaluate this invariant."
+        ]
       },
       {
-        "name": "Timer preconditions",
+        "name": "timer preconditions",
         "result": "UNKNOWN",
-        "evidence": []
+        "evidence": [
+          "state_machine: 'Modification Requested' to 'Error' on 'Timer Expires' indicates a timer exists, but conditions for starting/stopping are not detailed enough for a full check.",
+          "The bug is not related to timer expiration but to incorrect RNTI handling."
+        ]
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The gNB-CU crashes upon receiving an F1AP UE Context Modification Response with an incorrect RNTI. While the gNB-DU sending an incorrect RNTI might be a deviation from expected behavior, the gNB-CU's reaction of crashing indicates a lack of robust error handling. According to 3GPP specifications (e.g., \u00a78.3.4.3 Unsuccessful Operation, \u00a78.3.4.4 Abnormal Conditions), a gNB-CU should be able to gracefully handle abnormal conditions or unsuccessful operations, such as receiving an invalid identifier, without crashing. This suggests an implementation flaw in the gNB-CU's message parsing or context lookup logic, failing to validate the RNTI or handle the lookup failure gracefully. The crash points to a bug in the gNB-CU's code, specifically in CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE or related ID lookup functions."
+    "rationale": "The gNB-CU crashes when it receives a UE Context Modification Response containing an incorrect RNTI from the gNB-DU. This behavior indicates a critical flaw in the gNB-CU's error handling or input validation logic. A robust implementation should gracefully handle malformed or incorrect messages from peer entities, such as rejecting the message, logging an error, or transitioning to a defined error state, rather than crashing. While the gNB-DU sending an incorrect RNTI might be a separate issue, the gNB-CU's crash is an implementation bug."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-        "\u00a78.3.4.2 Successful Operation",
-        "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE",
-        "\u00a79.3.1.32 C-RNTI",
-        "\u00a78.3.4.3 Unsuccessful Operation",
-        "\u00a78.3.4.4 Abnormal Conditions"
+        "doc/F1AP/F1-design.md:100-104",
+        "doc/F1AP/F1-design.md:105-109",
+        "openair2/COMMON/f1ap_messages_types.h:409-410",
+        "doc/F1AP/F1-design.md:110-114"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE",
-        "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data",
-        "openair2/F1AP/lib/f1ap_ue_context.c:decode_ue_context_mod_resp"
+        "openair2/F1AP/f1ap_cu_ue_context_management.c:184-200",
+        "openair2/F1AP/lib/f1ap_ue_context.c:1008-1050",
+        "openair2/F1AP/f1ap_ids.c:69-75",
+        "openair2/F1AP/f1ap_messages_types.h:409-416",
+        "openair2/F1AP/f1ap_ids_test.c:29-44"
       ],
-      "expected_vs_observed": "The 3GPP specification mandates robust handling of F1AP messages, including the UE Context Modification Response, and proper management of identifiers like the C-RNTI. The expected behavior is that the gNB-CU should gracefully handle a UE Context Modification Response containing an incorrect RNTI, either by rejecting the message or recovering without a crash, as per specified abnormal conditions. However, the observed behavior is that the gNB-CU crashes when the gNB-DU sends a UE Context Modification Response with an incorrect RNTI, indicating a critical failure in the CU's error handling or ID validation logic."
+      "expected_vs_observed": "The expected behavior is that the gNB-CU should validate the RNTI provided in the UE Context Modification Response from the gNB-DU and handle an incorrect RNTI gracefully, without crashing. Instead, the observed behavior is that the gNB-CU crashes when the gNB-DU responds to a UE Context Modification request with an incorrect RNTI in the Information Element, indicating a failure in robust ID validation and error handling."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-CU crashes when receiving a UE Context Modification Response with an incorrect RNTI from the gNB-DU. This indicates a failure in the CU's error handling or ID validation logic, specifically related to ID binding, as the 3GPP specification mandates graceful handling of abnormal conditions and proper management of identifiers.",
+      "rationale": "The gNB-CU crashes when receiving a UE Context Modification Response with an incorrect RNTI, indicating a failure in robust ID validation and error handling within the gNB-CU. The 'ID binding' invariant check explicitly failed, confirming this issue.",
       "citations": {
         "spec": [
-          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-          "\u00a78.3.4.2 Successful Operation",
-          "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE",
-          "\u00a79.3.1.32 C-RNTI",
-          "\u00a78.3.4.3 Unsuccessful Operation",
-          "\u00a78.3.4.4 Abnormal Conditions"
+          "doc/F1AP/F1-design.md:100-104",
+          "doc/F1AP/F1-design.md:105-109",
+          "openair2/COMMON/f1ap_messages_types.h:409-410",
+          "doc/F1AP/F1-design.md:110-114"
         ],
         "code": [
-          "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE",
-          "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data",
-          "openair2/F1AP/lib/f1ap_ue_context.c:decode_ue_context_mod_resp"
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:184-200",
+          "openair2/F1AP/lib/f1ap_ue_context.c:1008-1050",
+          "openair2/F1AP/f1ap_ids.c:69-75",
+          "openair2/F1AP/f1ap_messages_types.h:409-416",
+          "openair2/F1AP/f1ap_ids_test.c:29-44"
         ]
       },
       "suggested_repro": [
         "1. Initiate a UE Context Modification procedure from gNB-CU to gNB-DU.",
-        "2. Configure the gNB-DU to respond with a UE Context Modification Response message.",
-        "3. Ensure the RNTI information element within this response is incorrect or invalid.",
-        "4. Observe the gNB-CU for a crash."
+        "2. Configure the gNB-DU to respond with a UE Context Modification Response containing an RNTI that does not match the RNTI sent in the initial request or an RNTI unknown to the gNB-CU for that context.",
+        "3. Observe the gNB-CU for a crash or abnormal termination."
       ],
       "risks": [
-        "Service disruption for UEs served by the affected gNB-CU.",
-        "Loss of UE context and potential for network instability.",
-        "Potential for denial of service if an attacker can trigger this condition."
+        "Service Interruption: A gNB-CU crash leads to service interruption for all UEs managed by that CU.",
+        "Loss of UE Context: A crash can result in the loss of critical UE context, requiring UEs to re-establish connections.",
+        "Network Instability: Repeated crashes can lead to overall network instability and degraded performance.",
+        "Security Vulnerability: An unhandled invalid ID could potentially be exploited for denial-of-service attacks."
       ],
       "next_steps": [
-        "Analyze gNB-CU crash logs and core dump to pinpoint the exact failure point.",
-        "Debug the identified code paths (e.g., CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE, cu_get_f1_ue_data) to understand the ID validation failure.",
-        "Implement robust error handling and ID validation for incoming F1AP messages, specifically for RNTI in UE Context Modification Response.",
-        "Add unit and integration tests to cover scenarios with incorrect or invalid RNTIs in F1AP messages."
+        "1. Root Cause Analysis: Debug the gNB-CU code at the cited locations to identify the exact point of crash and the missing RNTI validation logic.",
+        "2. Implement Robust Validation: Add explicit validation for the RNTI in the UE Context Modification Response to ensure it matches the expected RNTI for the ongoing transaction.",
+        "3. Graceful Error Handling: Implement graceful error handling (e.g., logging an error, sending an F1AP Error Indication, or initiating a UE release) instead of crashing when an incorrect RNTI is detected.",
+        "4. Unit/Integration Testing: Develop specific unit and integration tests to cover scenarios with incorrect or malformed IDs in F1AP messages."
       ]
     }
   }

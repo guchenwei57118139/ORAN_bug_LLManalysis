@@ -1,7 +1,7 @@
 {
   "step1": {
     "bug_card": {
-      "observed_behavior": "The gNB-CU registers a UE and processes an RRC Setup Success message, even when it receives an initialRRCTransfer with mutated DU ID and Transaction ID, and this occurs before the F1 Setup procedure is complete. This allows an attacker to send an incorrect UE Context Setup Request, followed by a UE Context Setup Success, and in parallel, an initialRRCTransfer with mutated IDs and an RRC Setup Success, leading to an incorrect UE registration state.",
+      "observed_behavior": "The gNB-CU registers a UE and processes an initialRRCTransfer with mutated DU ID and Transaction ID before F1 Setup is complete, and after an incorrect UE Context Setup Request was rejected, followed by an attacker-sent UE Context Setup Success. This indicates the CU relies on RRC Setup Success in an incorrect state and accepts out-of-sequence or malformed messages.",
       "interface_guess": [
         "F1AP",
         "RRC"
@@ -9,7 +9,7 @@
       "procedure_guess": [
         "UE Context Setup",
         "RRC Setup",
-        "Initial UE Message Procedure"
+        "Initial UE Message Transfer"
       ],
       "components_involved": [
         "gNB-CU",
@@ -17,8 +17,8 @@
         "gNB-DU"
       ],
       "key_ids": {
-        "transaction_id": "mutated Transaction ID",
-        "du_id": "mutated DU ID"
+        "transaction_id": "mutated",
+        "du_id": "mutated"
       },
       "signals_or_timers": [
         "UE Context Setup Request",
@@ -33,179 +33,232 @@
       {
         "Keywords": [
           "UE Context Setup",
+          "gNB-CU",
+          "gNB-DU",
           "F1AP",
-          "gNB-CU",
-          "gNB-DU",
-          "UE registration"
+          "RRC"
         ],
         "title": [
-          "8.3.1 UE Context Setup"
+          "UE Context Setup"
         ]
       },
       {
         "Keywords": [
           "UE CONTEXT SETUP REQUEST",
           "UE CONTEXT SETUP RESPONSE",
-          "gNB-CU",
-          "gNB-DU",
           "F1-connection",
-          "RRC Reconfiguration"
-        ],
-        "title": [
-          "8.3.1.2 Successful Operation"
-        ]
-      },
-      {
-        "Keywords": [
-          "UE CONTEXT SETUP REQUEST",
-          "gNB-CU UE F1AP ID",
-          "gNB-DU UE F1AP ID",
+          "RRC Reconfiguration",
           "RRC-Container",
-          "Transaction ID"
-        ],
-        "title": [
-          "9.2.2.1 UE CONTEXT SETUP REQUEST"
-        ]
-      },
-      {
-        "Keywords": [
-          "UE CONTEXT SETUP RESPONSE",
-          "gNB-CU UE F1AP ID",
-          "gNB-DU UE F1AP ID",
-          "Criticality Diagnostics",
-          "Transaction ID"
-        ],
-        "title": [
-          "9.2.2.2 UE CONTEXT SETUP RESPONSE"
-        ]
-      },
-      {
-        "Keywords": [
-          "gNB-DU UE F1AP ID",
-          "UE association",
-          "F1 interface",
+          "gNB-CU",
           "gNB-DU"
         ],
         "title": [
-          "9.3.1.5 gNB-DU UE F1AP ID"
+          "UE Context Setup",
+          "Successful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE CONTEXT SETUP FAILURE",
+          "gNB-DU",
+          "F1 UE context",
+          "cause value"
+        ],
+        "title": [
+          "UE Context Setup",
+          "Unsuccessful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE CONTEXT SETUP REQUEST",
+          "gNB-CU UE F1AP ID",
+          "gNB-DU UE F1AP ID",
+          "Transaction ID",
+          "RRC-Container",
+          "F1AP"
+        ],
+        "title": [
+          "UE CONTEXT SETUP REQUEST"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE CONTEXT SETUP RESPONSE",
+          "gNB-CU UE F1AP ID",
+          "gNB-DU UE F1AP ID",
+          "F1AP"
+        ],
+        "title": [
+          "UE CONTEXT SETUP RESPONSE"
         ]
       },
       {
         "Keywords": [
           "Transaction ID",
           "procedure",
-          "F1-C signalling",
-          "Criticality Diagnostics"
+          "F1AP",
+          "message identification"
         ],
         "title": [
-          "9.3.1.23 Transaction ID"
+          "Transaction ID"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-CU shall only register a UE and process an RRC Setup Success message after the F1 Setup procedure is complete and a valid UE-associated logical F1-connection has been established. All F1AP messages, including UE CONTEXT SETUP REQUEST and initialRRCTransfer, shall be validated to ensure that the gNB-DU UE F1AP ID and Transaction ID are consistent with an existing and correctly established UE context. If mutated or inconsistent IDs are detected, or if the F1 Setup procedure is not complete, the gNB-CU shall reject the request and indicate a failure, for example, by sending a UE CONTEXT SETUP FAILURE message with an appropriate cause such as 'Unknown or inconsistent pair of UE F1AP ID' or 'Unknown or already allocated gNB-DU UE F1AP ID'."
+    "expected_behaviour": "The gNB-CU is expected to: 1. Not process an initialRRCTransfer before F1 Setup is complete. 2. Not accept a UE Context Setup Success message if a preceding UE Context Setup Request was rejected. 3. Validate the integrity of DU ID and Transaction ID in F1AP messages and reject messages with mutated IDs. 4. Reject out-of-sequence or malformed F1AP messages. 5. Not rely on RRC Setup Success in an incorrect or inconsistent state."
   },
   "step3": {
     "candidate_code": [
       {
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "Central dispatcher for all F1AP messages; crucial for understanding how out-of-sequence or malformed messages are processed."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_decode_pdu",
+        "reason": "Performs ASN.1 decoding of incoming F1AP PDUs; essential for identifying how malformed messages are handled at the lowest layer."
+      },
+      {
         "path": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
         "function_name": "CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
-        "reason": "This function is the entry point on the gNB-CU for the 'initialRRCTransfer' message, which is central to the bug. It should contain logic for validating DU ID and Transaction ID, and checking F1 Setup completion status."
-      },
-      {
-        "path": "openair2/F1AP/lib/f1ap_rrc_message_transfer.c",
-        "function_name": "decode_initial_ul_rrc_message_transfer",
-        "reason": "This function is responsible for decoding the 'initialRRCTransfer' message, including the DU ID and Transaction ID. Any mutation or incorrect parsing would originate or be detectable here."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "cu_exists_f1_ue_data",
-        "reason": "The bug involves 'mutated DU ID' and 'incorrect UE registration state'. This file manages UE F1AP IDs on the CU side, and these functions are crucial for validating the existence and consistency of DU IDs associated with UE contexts."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "cu_get_f1_ue_data",
-        "reason": "Used to retrieve UE F1AP data, including the DU UE ID, which is then compared against the received DU ID in RRC message transfers. This is key for detecting mutated IDs."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "cu_update_f1_ue_data",
-        "reason": "If an incorrect DU ID is accepted, this function might be used to update the UE context with the mutated ID, leading to an incorrect state."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_common.c",
-        "function_name": "F1AP_get_next_transaction_identifier",
-        "reason": "The bug mentions 'mutated Transaction ID'. This function is responsible for generating transaction IDs, so its usage and any validation against received IDs are critical."
+        "reason": "Handles the 'initialRRCTransfer' message on the gNB-CU; directly relevant to the bug's observed behavior of processing this message in an incorrect state with mutated IDs."
       },
       {
         "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
         "function_name": "CU_handle_UE_CONTEXT_SETUP_RESPONSE",
-        "reason": "The bug states an 'incorrect UE Context Setup Request, followed by a UE Context Setup Success' occurs. This function handles the response, and its logic might contribute to the incorrect registration state."
+        "reason": "Processes successful UE Context Setup messages from the gNB-DU; critical for understanding how the CU reacts to an 'attacker-sent UE Context Setup Success' after a rejection."
       },
       {
         "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
-        "function_name": "CU_send_UE_CONTEXT_SETUP_REQUEST",
-        "reason": "This function sends the UE Context Setup Request. If the CU sends an incorrect request based on mutated IDs, this is a relevant point."
+        "function_name": "CU_handle_UE_CONTEXT_SETUP_FAILURE",
+        "reason": "Processes failed UE Context Setup messages from the gNB-DU; important to see how the CU transitions state after a rejection, which is then bypassed by an attacker-sent success message."
       },
       {
-        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
-        "function_name": "DU_handle_UE_CONTEXT_SETUP_REQUEST",
-        "reason": "This function handles the UE Context Setup Request on the DU side. It should validate the received IDs and ensure the F1 Setup is complete before proceeding."
+        "path": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "function_name": "decode_ue_context_setup_req",
+        "reason": "Library function for decoding UE Context Setup Request; relevant for understanding how mutated DU IDs and Transaction IDs are parsed and validated."
       },
       {
-        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
-        "function_name": "DU_send_UE_CONTEXT_SETUP_RESPONSE",
-        "reason": "This function sends the UE Context Setup Response from the DU. Its logic might be influenced by mutated IDs received in the request."
+        "path": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "function_name": "decode_ue_context_setup_resp",
+        "reason": "Library function for decoding UE Context Setup Response; relevant for understanding how mutated DU IDs and Transaction IDs are parsed and validated."
       },
       {
-        "path": "openair2/F1AP/f1ap_handlers.c",
-        "function_name": "f1ap_handle_message",
-        "reason": "This is the central dispatcher for all F1AP messages. It's important to check if any early validation or state checks are performed before routing messages like 'initialRRCTransfer' or 'UE Context Setup Request'."
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_get_f1_ue_data",
+        "reason": "Manages the mapping and retrieval of DU UE IDs on the CU side; crucial for validating the 'mutated DU ID' mentioned in the bug."
       },
       {
-        "path": "openair2/F1AP/f1ap_cu_interface_management.c",
-        "function_name": "CU_handle_F1_SETUP_REQUEST",
-        "reason": "The bug occurs 'before the F1 Setup procedure is complete'. This function is part of the F1 Setup, and its state management is critical to prevent premature message processing."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_du_interface_management.c",
-        "function_name": "DU_handle_F1_SETUP_RESPONSE",
-        "reason": "This function handles the F1 Setup Response on the DU side. The completion of F1 Setup is a prerequisite for other procedures, so its state handling is relevant."
-      },
-      {
-        "path": "openair2/RRC/NR/rrc_gNB_cuup.c",
-        "function_name": "rrc_gNB_process_e1_setup_req",
-        "reason": "While E1AP, the `remove_unassociated_e1_connections` function called here triggers F1 resets and cleans up UE contexts, which might be related to the overall UE registration state and F1 setup completion."
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_exists_f1_ue_data",
+        "reason": "Checks for the existence of a DU UE ID mapping; relevant for state checks related to UE context."
       },
       {
         "path": "openair2/RRC/NR/rrc_gNB_du.c",
-        "function_name": "dl_rrc_message_transfer",
-        "reason": "This is the RRC-side handler for DL RRC messages, including RRC Setup Success. Its interaction with F1AP and UE context management is crucial."
+        "function_name": "rrc_gNB_process_f1_setup_req",
+        "reason": "Processes the F1 Setup Request from the gNB-DU; contains logic for validating the DU and establishing the F1 connection, which is stated as 'before F1 Setup is complete' in the bug."
+      },
+      {
+        "path": "openair2/RRC/NR/rrc_gNB_du.c",
+        "function_name": "get_du_for_ue",
+        "reason": "Retrieves the DU context associated with a UE; important for checking the F1 setup status for a specific UE."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_common.c",
+        "function_name": "F1AP_get_next_transaction_identifier",
+        "reason": "Manages transaction IDs; relevant for understanding how 'mutated Transaction ID' might be handled or validated."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_task.c",
+        "function_name": "F1AP_CU_task",
+        "reason": "The main task loop for the F1AP CU; responsible for receiving and dispatching all F1AP messages, providing the overall context for state transitions."
       }
     ],
     "control": {
       "decision": "continue",
       "fetch_requests": [
         {
-          "pattern": "openair2/F1AP/**/*.c",
+          "pattern": "openair2/F1AP/f1ap_handlers.c",
           "suffix": [
-            ".c"
-          ]
-        },
-        {
-          "pattern": "openair2/F1AP/**/*.h",
-          "suffix": [
+            ".c",
             ".h"
           ]
         },
         {
-          "pattern": "openair2/RRC/NR/**/*.c",
+          "pattern": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
           "suffix": [
-            ".c"
+            ".c",
+            ".h"
           ]
         },
         {
-          "pattern": "openair2/RRC/NR/**/*.h",
+          "pattern": "openair2/F1AP/f1ap_cu_ue_context_management.c",
           "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/F1AP/lib/f1ap_ue_context.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_ids.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/RRC/NR/rrc_gNB_du.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_common.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_cu_task.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/F1AP/lib/f1ap_rrc_message_transfer.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/F1AP/lib/f1ap_interface_management.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/RRC/NR/rrc_gNB_UE_context.c",
+          "suffix": [
+            ".c",
+            ".h"
+          ]
+        },
+        {
+          "pattern": "openair2/RRC/NR/rrc_gNB_NGAP.h",
+          "suffix": [
+            ".c",
             ".h"
           ]
         }
@@ -216,353 +269,438 @@
     "snippets": [
       {
         "kind": "spec",
-        "source": "This section describes the UE Context Setup procedure, which is a fundamental F1AP procedure involving the gNB-CU and gNB-DU for UE registration.",
-        "location": "8.3.1 UE Context Setup"
+        "source": "doc/F1AP/F1-design.md",
+        "location": "doc/F1AP/F1-design.md"
       },
       {
         "kind": "spec",
-        "source": "Details the successful operation of the UE Context Setup procedure, including the exchange of UE CONTEXT SETUP REQUEST and UE CONTEXT SETUP RESPONSE messages between gNB-CU and gNB-DU, and its relation to F1-connection and RRC Reconfiguration.",
-        "location": "8.3.1.2 Successful Operation"
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:268-300"
       },
       {
         "kind": "spec",
-        "source": "Specifies the UE CONTEXT SETUP REQUEST message, detailing its information elements such as gNB-CU UE F1AP ID, gNB-DU UE F1AP ID, RRC-Container, and Transaction ID, which are crucial for establishing UE context.",
-        "location": "9.2.2.1 UE CONTEXT SETUP REQUEST"
+        "source": "openair2/F1AP/f1ap_cu_ue_context_management.h",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.h:11-14"
       },
       {
         "kind": "spec",
-        "source": "Describes the UE CONTEXT SETUP RESPONSE message, including its key information elements like gNB-CU UE F1AP ID, gNB-DU UE F1AP ID, Criticality Diagnostics, and Transaction ID, used to confirm UE context establishment.",
-        "location": "9.2.2.2 UE CONTEXT SETUP RESPONSE"
+        "source": "openair2/F1AP/f1ap_du_ue_context_management.h",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.h:11-13"
       },
       {
         "kind": "spec",
-        "source": "Defines the gNB-DU UE F1AP ID, an identifier used to uniquely associate a UE context on the F1 interface within the gNB-DU.",
-        "location": "9.3.1.5 gNB-DU UE F1AP ID"
+        "source": "openair2/F1AP/lib/f1ap_ue_context.h",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.h:11-15"
       },
       {
         "kind": "spec",
-        "source": "Explains the Transaction ID, a crucial identifier used in F1-C signalling to correlate messages belonging to the same procedure, often accompanied by Criticality Diagnostics.",
-        "location": "9.3.1.23 Transaction ID"
+        "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:1008-1014"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:1016-1022"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:302-310"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:37-39"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:268-300"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:15-25"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:704-710"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:712-718"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:268-300"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:1008-1014"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:1016-1022"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:268-300"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:100-102"
+      },
+      {
+        "kind": "spec",
+        "source": "openair2/COMMON/f1ap_messages_types.h",
+        "location": "openair2/COMMON/f1ap_messages_types.h:312-318"
       },
       {
         "kind": "code",
-        "source": "This function is the entry point on the gNB-CU for the 'initialRRCTransfer' message, which is central to the bug. It should contain logic for validating DU ID and Transaction ID, and checking F1 Setup completion status.",
-        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER"
+        "source": "openair2/F1AP/f1ap_handlers.c",
+        "location": "openair2/F1AP/f1ap_handlers.c:90-128"
       },
       {
         "kind": "code",
-        "source": "This function is responsible for decoding the 'initialRRCTransfer' message, including the DU ID and Transaction ID. Any mutation or incorrect parsing would originate or be detectable here.",
-        "location": "openair2/F1AP/lib/f1ap_rrc_message_transfer.c:decode_initial_ul_rrc_message_transfer"
+        "source": "openair2/F1AP/f1ap_handlers.c",
+        "location": "openair2/F1AP/f1ap_handlers.c:75-88"
       },
       {
         "kind": "code",
-        "source": "The bug involves 'mutated DU ID' and 'incorrect UE registration state'. This file manages UE F1AP IDs on the CU side, and these functions are crucial for validating the existence and consistency of DU IDs associated with UE contexts.",
-        "location": "openair2/F1AP/f1ap_ids.c:cu_exists_f1_ue_data"
+        "source": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
+        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:26-38"
       },
       {
         "kind": "code",
-        "source": "Used to retrieve UE F1AP data, including the DU UE ID, which is then compared against the received DU ID in RRC message transfers. This is key for detecting mutated IDs.",
-        "location": "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data"
+        "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62"
       },
       {
         "kind": "code",
-        "source": "If an incorrect DU ID is accepted, this function might be used to update the UE context with the mutated ID, leading to an incorrect state.",
-        "location": "openair2/F1AP/f1ap_ids.c:cu_update_f1_ue_data"
+        "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67"
       },
       {
         "kind": "code",
-        "source": "The bug mentions 'mutated Transaction ID'. This function is responsible for generating transaction IDs, so its usage and any validation against received IDs are critical.",
-        "location": "openair2/F1AP/f1ap_common.c:F1AP_get_next_transaction_identifier"
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:712-769"
       },
       {
         "kind": "code",
-        "source": "The bug states an 'incorrect UE Context Setup Request, followed by a UE Context Setup Success' occurs. This function handles the response, and its logic might contribute to the incorrect registration state.",
-        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_SETUP_RESPONSE"
+        "source": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:1016-1067"
       },
       {
         "kind": "code",
-        "source": "This function sends the UE Context Setup Request. If the CU sends an incorrect request based on mutated IDs, this is a relevant point.",
-        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_send_UE_CONTEXT_SETUP_REQUEST"
+        "source": "openair2/F1AP/f1ap_ids.c",
+        "location": "openair2/F1AP/f1ap_ids.c:70-76"
       },
       {
         "kind": "code",
-        "source": "This function handles the UE Context Setup Request on the DU side. It should validate the received IDs and ensure the F1 Setup is complete before proceeding.",
-        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST"
+        "source": "openair2/F1AP/f1ap_ids.c",
+        "location": "openair2/F1AP/f1ap_ids.c:59-65"
       },
       {
         "kind": "code",
-        "source": "This function sends the UE Context Setup Response from the DU. Its logic might be influenced by mutated IDs received in the request.",
-        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_send_UE_CONTEXT_SETUP_RESPONSE"
+        "source": "openair2/RRC/NR/rrc_gNB_du.c",
+        "location": "openair2/RRC/NR/rrc_gNB_du.c:248-340"
       },
       {
         "kind": "code",
-        "source": "This is the central dispatcher for all F1AP messages. It's important to check if any early validation or state checks are performed before routing messages like 'initialRRCTransfer' or 'UE Context Setup Request'.",
-        "location": "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message"
+        "source": "openair2/RRC/NR/rrc_gNB_du.c",
+        "location": "openair2/RRC/NR/rrc_gNB_du.c:523-529"
       },
       {
         "kind": "code",
-        "source": "The bug occurs 'before the F1 Setup procedure is complete'. This function is part of the F1 Setup, and its state management is critical to prevent premature message processing.",
-        "location": "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST"
+        "source": "openair2/F1AP/f1ap_common.c",
+        "location": "openair2/F1AP/f1ap_common.c:16-21"
       },
       {
         "kind": "code",
-        "source": "This function handles the F1 Setup Response on the DU side. The completion of F1 Setup is a prerequisite for other procedures, so its state handling is relevant.",
-        "location": "openair2/F1AP/f1ap_du_interface_management.c:DU_handle_F1_SETUP_RESPONSE"
-      },
-      {
-        "kind": "code",
-        "source": "While E1AP, the `remove_unassociated_e1_connections` function called here triggers F1 resets and cleans up UE contexts, which might be related to the overall UE registration state and F1 setup completion.",
-        "location": "openair2/RRC/NR/rrc_gNB_cuup.c:rrc_gNB_process_e1_setup_req"
-      },
-      {
-        "kind": "code",
-        "source": "This is the RRC-side handler for DL RRC messages, including RRC Setup Success. Its interaction with F1AP and UE context management is crucial.",
-        "location": "openair2/RRC/NR/rrc_gNB_du.c:dl_rrc_message_transfer"
+        "source": "openair2/F1AP/f1ap_cu_task.c",
+        "location": "openair2/F1AP/f1ap_cu_task.c:60-143"
       }
     ]
   },
   "step5": {
     "sequence_diagram": [
       {
-        "from": "Attacker",
+        "from": "Attacker (gNB-DU)",
         "to": "gNB-CU",
-        "message": "UE Context Setup Request",
-        "precond": "F1 Setup procedure is not complete. Attacker has knowledge of F1AP message structure.",
-        "postcond": "gNB-CU receives and processes the request, potentially allocating resources for a non-existent UE context."
-      },
-      {
-        "from": "Attacker",
-        "to": "gNB-CU",
-        "message": "UE Context Setup Response (Success)",
-        "precond": "gNB-CU has processed the Attacker's UE Context Setup Request. F1 Setup procedure is not complete.",
-        "postcond": "gNB-CU believes a UE context is successfully established, despite F1 not being ready and the request being illegitimate."
-      },
-      {
-        "from": "Attacker",
-        "to": "gNB-CU",
-        "message": "initialRRCTransfer (containing RRC Setup Success, mutated DU ID, mutated Transaction ID)",
-        "precond": "F1 Setup procedure is not complete. Attacker crafts message with mutated IDs.",
-        "postcond": "gNB-CU receives the initialRRCTransfer message with mutated identifiers."
+        "message": "F1AP: UE Context Setup Request (malformed/incorrect)",
+        "precond": "F1 Setup not complete",
+        "postcond": "gNB-CU receives the request and attempts to process it."
       },
       {
         "from": "gNB-CU",
-        "to": "gNB-CU (internal)",
-        "message": "Process RRC Setup Success",
-        "precond": "gNB-CU received initialRRCTransfer with mutated DU ID and Transaction ID. F1 Setup procedure is not complete.",
-        "postcond": "gNB-CU enters an incorrect UE registration state, associating RRC Setup Success with a potentially invalid or non-existent UE context."
+        "to": "Attacker (gNB-DU)",
+        "message": "F1AP: UE Context Setup Failure",
+        "precond": "gNB-CU detected malformed/incorrect UE Context Setup Request.",
+        "postcond": "UE Context is not legitimately established at gNB-CU."
+      },
+      {
+        "from": "Attacker (gNB-DU)",
+        "to": "gNB-CU",
+        "message": "F1AP: UE Context Setup Success",
+        "precond": "No pending UE Context Setup Request from gNB-CU; previous request was rejected.",
+        "postcond": "gNB-CU incorrectly transitions to a state where it believes UE context is established."
+      },
+      {
+        "from": "Attacker (gNB-DU)",
+        "to": "gNB-CU",
+        "message": "F1AP: Initial UL RRC Message Transfer (containing initialRRCTransfer, with mutated DU ID and Transaction ID)",
+        "precond": "gNB-CU believes UE context is established (due to previous incorrect message).",
+        "postcond": "gNB-CU processes the initialRRCTransfer, potentially creating an inconsistent UE context or accepting an invalid RRC message."
       }
     ],
     "state_machine": {
       "states": [
-        "F1_Disconnected",
-        "F1_Setup_InProgress",
-        "F1_Connected",
-        "UE_Context_Incorrectly_Pending",
-        "UE_Context_Incorrectly_Established",
-        "UE_Registered_Incorrectly"
+        "F1_NOT_SETUP",
+        "F1_SETUP_COMPLETE",
+        "UE_CONTEXT_IDLE",
+        "UE_CONTEXT_SETUP_PROCESSING",
+        "UE_CONTEXT_REJECTED",
+        "UE_CONTEXT_INCONSISTENT"
       ],
       "transitions": [
         {
-          "from": "F1_Disconnected",
-          "to": "F1_Setup_InProgress",
-          "on": "F1_SETUP_REQUEST"
+          "from": "F1_NOT_SETUP",
+          "to": "F1_SETUP_COMPLETE",
+          "on": "F1 Setup Complete (legitimate F1 Setup procedure)"
         },
         {
-          "from": "F1_Setup_InProgress",
-          "to": "F1_Connected",
-          "on": "F1_SETUP_RESPONSE"
+          "from": "F1_SETUP_COMPLETE",
+          "to": "UE_CONTEXT_IDLE",
+          "on": "F1 Setup Complete"
         },
         {
-          "from": "F1_Setup_InProgress",
-          "to": "UE_Context_Incorrectly_Pending",
-          "on": "UE_CONTEXT_SETUP_REQUEST"
+          "from": "UE_CONTEXT_IDLE",
+          "to": "UE_CONTEXT_SETUP_PROCESSING",
+          "on": "F1AP: UE Context Setup Request (legitimate DU)"
         },
         {
-          "from": "UE_Context_Incorrectly_Pending",
-          "to": "UE_Context_Incorrectly_Established",
-          "on": "UE_CONTEXT_SETUP_RESPONSE"
+          "from": "F1_NOT_SETUP",
+          "to": "UE_CONTEXT_SETUP_PROCESSING",
+          "on": "F1AP: UE Context Setup Request (Attacker)",
+          "guard": "F1 Setup not complete (CU accepts F1AP message prematurely)"
         },
         {
-          "from": "F1_Setup_InProgress",
-          "to": "UE_Registered_Incorrectly",
-          "on": "initialRRCTransfer",
-          "guard": "Mutated_DU_ID_OR_Transaction_ID"
+          "from": "UE_CONTEXT_SETUP_PROCESSING",
+          "to": "UE_CONTEXT_REJECTED",
+          "on": "Process UE Context Setup Request",
+          "guard": "Request is malformed/incorrect"
         },
         {
-          "from": "UE_Context_Incorrectly_Established",
-          "to": "UE_Registered_Incorrectly",
-          "on": "initialRRCTransfer",
-          "guard": "Mutated_DU_ID_OR_Transaction_ID"
+          "from": "UE_CONTEXT_REJECTED",
+          "to": "UE_CONTEXT_INCONSISTENT",
+          "on": "F1AP: UE Context Setup Success (Attacker)",
+          "guard": "No pending UE Context Setup Request from CU (out-of-sequence)"
+        },
+        {
+          "from": "UE_CONTEXT_INCONSISTENT",
+          "to": "UE_CONTEXT_INCONSISTENT",
+          "on": "F1AP: Initial UL RRC Message Transfer (Attacker)",
+          "guard": "DU ID or Transaction ID mutated (CU processes despite invalid IDs)"
         }
       ]
     },
     "assumptions": [
-      "The attacker has network access to send F1AP messages directly to the gNB-CU.",
-      "The attacker can craft F1AP messages (UE Context Setup Request/Response, initialRRCTransfer) with arbitrary/mutated DU ID and Transaction ID.",
-      "The attacker can include an RRC Setup Success message within the initialRRCTransfer.",
-      "The gNB-CU does not strictly validate the F1 Setup completion status before processing certain F1AP messages (UE Context Setup, initialRRCTransfer).",
-      "The gNB-CU does not sufficiently validate the DU ID and Transaction ID in initialRRCTransfer or UE Context Setup messages against established F1AP contexts or expected values.",
-      "The 'UE Context Setup Success' mentioned in the bug refers to a successful UE CONTEXT SETUP RESPONSE message.",
-      "The 'incorrect UE registration state' implies the gNB-CU believes a UE is registered when it shouldn't be, or with incorrect parameters, leading to resource leakage or other issues."
+      "The 'attacker' is a malicious entity impersonating a gNB-DU.",
+      "The phrase 'before F1 Setup is complete' implies that the F1AP F1 Setup procedure has not been successfully concluded between the gNB-CU and a legitimate gNB-DU.",
+      "'Mutated DU ID and Transaction ID' means these identifiers are invalid, non-existent, or do not correspond to any established context at the gNB-CU.",
+      "The gNB-CU is expected to reject F1AP messages related to UE context management if the F1 interface is not fully set up.",
+      "The gNB-CU is expected to reject out-of-sequence F1AP messages, such as a UE Context Setup Success without a preceding UE Context Setup Request initiated by the CU.",
+      "The gNB-CU should validate DU ID and Transaction ID in Initial UL RRC Message Transfer against established contexts before processing the RRC message."
     ],
     "questions": [
-      "What specific validation checks are missing in CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER regarding F1 Setup completion and ID consistency?",
-      "How does the gNB-CU handle duplicate or conflicting UE contexts if mutated IDs lead to such a scenario?",
-      "What are the exact consequences of the 'incorrect UE registration state' (e.g., resource leakage, denial of service, incorrect billing)?",
-      "Is there any authentication or integrity protection mechanism for F1AP messages that the attacker is bypassing or exploiting?",
-      "Does the gNB-CU attempt to establish a legitimate F1 connection with the actual gNB-DU in parallel to the attack, and how does this interaction affect the bug?",
-      "Are there any timeouts associated with F1 Setup or UE Context Setup that could mitigate this attack?"
+      "What specific checks are missing in the gNB-CU that allow it to process F1AP messages (like UE Context Setup Request or Initial UL RRC Message Transfer) before F1 Setup is complete?",
+      "How does the gNB-CU handle UE Context Setup Success messages when no corresponding UE Context Setup Request was initiated by the CU, or when a previous request was rejected? Is there a state machine for UE context at the CU that is being bypassed?",
+      "What is the exact impact of processing an Initial UL RRC Message Transfer with mutated DU ID and Transaction ID? Does it lead to resource allocation, state corruption, or denial of service?",
+      "Are there any specific F1AP message handlers in the gNB-CU that lack proper state validation or ID validation, particularly for DU ID and Transaction ID?",
+      "Does the initialRRCTransfer itself contain information that could be used to further exploit the CU, beyond just the mutated IDs in the F1AP wrapper?"
     ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "F1 Setup Completion Precondition",
+        "name": "directionality",
         "result": "FAIL",
         "evidence": [
-          "The sequence_diagram and observed_behavior clearly state that UE Context Setup Request, UE Context Setup Response, and initialRRCTransfer are processed by the gNB-CU before the F1 Setup procedure is complete.",
-          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER: \"It should contain logic for validating DU ID and Transaction ID, and checking F1 Setup completion status.\"",
-          "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST: \"The bug occurs 'before the F1 Setup procedure is complete'. This function is part of the F1 Setup, and its state management is critical to prevent premature message processing.\"",
-          "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message: \"It's important to check if any early validation or state checks are performed before routing messages like 'initialRRCTransfer' or 'UE Context Setup Request'.",
-          "8.3.1.2 Successful Operation: \"Details the successful operation of the UE Context Setup procedure, including the exchange of UE CONTEXT SETUP REQUEST and UE CONTEXT SETUP RESPONSE messages between gNB-CU and gNB-DU, and its relation to F1-connection and RRC Reconfiguration.\""
+          "sequence_diagram: step 3, 'Attacker (gNB-DU)' -> 'gNB-CU': 'F1AP: UE Context Setup Success'",
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67 (CU sends UE Context Setup Success)",
+          "openair2/F1AP/f1ap_du_ue_context_management.c:37-39 (DU receives UE Context Setup Success)"
         ]
       },
       {
-        "name": "ID Binding and Validation (DU ID, Transaction ID)",
+        "name": "req/resp pairing",
         "result": "FAIL",
         "evidence": [
-          "The observed_behavior and sequence_diagram clearly state that the gNB-CU processes initialRRCTransfer with \"mutated DU ID\" and \"mutated Transaction ID\".",
-          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER: \"It should contain logic for validating DU ID and Transaction ID.\"",
-          "openair2/F1AP/f1ap_ids.c:cu_exists_f1_ue_data: \"These functions are crucial for validating the existence and consistency of DU IDs associated with UE contexts.\"",
-          "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data: \"Used to retrieve UE F1AP data, including the DU UE ID, which is then compared against the received DU ID in RRC message transfers. This is key for detecting mutated IDs.\"",
-          "9.3.1.5 gNB-DU UE F1AP ID: \"Defines the gNB-DU UE F1AP ID, an identifier used to uniquely associate a UE context on the F1 interface within the gNB-DU.\"",
-          "9.3.1.23 Transaction ID: \"Explains the Transaction ID, a crucial identifier used in F1-C signalling to correlate messages belonging to the same procedure, often accompanied by Criticality Diagnostics.\""
+          "sequence_diagram: step 2, 'gNB-CU' -> 'Attacker (gNB-DU)': 'F1AP: UE Context Setup Failure' (concludes initial request)",
+          "sequence_diagram: step 3, 'Attacker (gNB-DU)' -> 'gNB-CU': 'F1AP: UE Context Setup Success' (sent without a pending request from CU)",
+          "state_machine: transition 'UE_CONTEXT_REJECTED' -> 'UE_CONTEXT_INCONSISTENT' on 'F1AP: UE Context Setup Success (Attacker)', guard: 'No pending UE Context Setup Request from CU (out-of-sequence)'"
         ]
       },
       {
-        "name": "Req/Resp Pairing and State Management for UE Context Setup",
+        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
         "result": "FAIL",
         "evidence": [
-          "The sequence_diagram shows the gNB-CU accepting an UE Context Setup Request and UE Context Setup Response from an attacker before F1 Setup is complete.",
-          "8.3.1.2 Successful Operation: \"Details the successful operation of the UE Context Setup procedure, including the exchange of UE CONTEXT SETUP REQUEST and UE CONTEXT SETUP RESPONSE messages between gNB-CU and gNB-DU, and its relation to F1-connection and RRC Reconfiguration.\"",
-          "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_SETUP_RESPONSE: \"The bug states an 'incorrect UE Context Setup Request, followed by a UE Context Setup Success' occurs. This function handles the response, and its logic might contribute to the incorrect registration state.\"",
-          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST: \"This function handles the UE Context Setup Request on the DU side. It should validate the received IDs and ensure the F1 Setup is complete before proceeding.\""
+          "bug_card.observed_behavior: 'processes an initialRRCTransfer with mutated DU ID and Transaction ID'",
+          "state_machine: transition 'UE_CONTEXT_INCONSISTENT' -> 'UE_CONTEXT_INCONSISTENT' on 'F1AP: Initial UL RRC Message Transfer (Attacker)', guard: 'DU ID or Transaction ID mutated (CU processes despite invalid IDs)'",
+          "openair2/COMMON/f1ap_messages_types.h:268-300 (defines F1AP IDs)"
         ]
       },
       {
-        "name": "Directionality of F1AP Messages",
+        "name": "transaction scoping",
         "result": "FAIL",
         "evidence": [
-          "The sequence_diagram clearly depicts the Attacker sending UE Context Setup Request and UE Context Setup Response (Success) directly to the gNB-CU.",
-          "8.3.1.2 Successful Operation: \"exchange of UE CONTEXT SETUP REQUEST and UE CONTEXT SETUP RESPONSE messages between gNB-CU and gNB-DU\". This implies the standard flow where CU sends Request to DU, and DU sends Response to CU.",
-          "9.2.2.1 UE CONTEXT SETUP REQUEST: This message is typically initiated by the CU.",
-          "9.2.2.2 UE CONTEXT SETUP RESPONSE: This message is typically sent by the DU in response."
+          "sequence_diagram: step 3 precond: 'No pending UE Context Setup Request from gNB-CU; previous request was rejected.'",
+          "state_machine: transition 'UE_CONTEXT_REJECTED' -> 'UE_CONTEXT_INCONSISTENT' on 'F1AP: UE Context Setup Success (Attacker)', guard: 'No pending UE Context Setup Request from CU (out-of-sequence)'",
+          "bug_card.observed_behavior: 'accepts out-of-sequence or malformed messages.'"
         ]
       },
       {
-        "name": "Transaction Scoping",
+        "name": "no-pending-request on new request",
         "result": "FAIL",
         "evidence": [
-          "The observed_behavior and sequence_diagram indicate that an initialRRCTransfer message with a \"mutated Transaction ID\" is processed by the gNB-CU.",
-          "9.3.1.23 Transaction ID: \"Explains the Transaction ID, a crucial identifier used in F1-C signalling to correlate messages belonging to the same procedure.\"",
-          "openair2/F1AP/f1ap_common.c:F1AP_get_next_transaction_identifier: \"This function is responsible for generating transaction IDs, so its usage and any validation against received IDs are critical.\""
+          "sequence_diagram: step 3 precond: 'No pending UE Context Setup Request from gNB-CU; previous request was rejected.'",
+          "state_machine: transition 'UE_CONTEXT_REJECTED' -> 'UE_CONTEXT_INCONSISTENT' on 'F1AP: UE Context Setup Success (Attacker)', guard: 'No pending UE Context Setup Request from CU (out-of-sequence)'"
         ]
       },
       {
-        "name": "No-pending-request on new request",
+        "name": "timer preconditions",
         "result": "FAIL",
         "evidence": [
-          "The sequence_diagram illustrates the gNB-CU processing an UE Context Setup Request, an UE Context Setup Response, and an initialRRCTransfer message in parallel, all while the F1 Setup procedure is not complete.",
-          "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message: \"It's important to check if any early validation or state checks are performed before routing messages like 'initialRRCTransfer' or 'UE Context Setup Request'.\"",
-          "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST: \"its state management is critical to prevent premature message processing.\""
+          "bug_card.observed_behavior: 'before F1 Setup is complete'",
+          "sequence_diagram: step 1 precond: 'F1 Setup not complete'",
+          "state_machine: transition 'F1_NOT_SETUP' -> 'UE_CONTEXT_SETUP_PROCESSING' on 'F1AP: UE Context Setup Request (Attacker)', guard: 'F1 Setup not complete (CU accepts F1AP message prematurely)'",
+          "doc/F1AP/F1-design.md (implies F1 setup must be complete for F1AP procedures)"
         ]
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The gNB-CU processes F1AP messages, specifically UE Context Setup Request, UE Context Setup Response, and initialRRCTransfer, with mutated identifiers (DU ID, Transaction ID) and critically, before the F1 Setup procedure is complete. This violates fundamental F1AP protocol invariants regarding F1 Setup completion, ID validation, message directionality, and procedure state management. The specification snippets (e.g., 8.3.1.2 Successful Operation, 9.3.1.23 Transaction ID) define the correct usage of these procedures and identifiers, implying that F1 Setup completion and ID validation are prerequisites. The code snippets (e.g., CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER, f1ap_ids.c:cu_get_f1_ue_data, f1ap_handlers.c:f1ap_handle_message) explicitly mention or imply the necessity of checks for F1 Setup status and ID validation. The observed behavior indicates a failure in the gNB-CU's implementation to correctly enforce these checks, allowing an attacker to manipulate the UE registration state."
+    "rationale": "The gNB-CU exhibits multiple critical failures in its F1AP message processing and state management. It accepts F1AP messages (UE Context Setup Request) before the F1 interface is fully established, processes an F1AP message (UE Context Setup Success) sent in the incorrect direction and out-of-sequence, and subsequently processes an Initial UL RRC Message Transfer despite mutated DU ID and Transaction ID. These issues indicate a fundamental flaw in the CU's implementation regarding state machine transitions, message validation, and adherence to F1AP procedural specifications, leading to an inconsistent UE context state."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "8.3.1 UE Context Setup",
-        "8.3.1.2 Successful Operation",
-        "9.2.2.1 UE CONTEXT SETUP REQUEST",
-        "9.2.2.2 UE CONTEXT SETUP RESPONSE",
-        "9.3.1.5 gNB-DU UE F1AP ID",
-        "9.3.1.23 Transaction ID"
+        "doc/F1AP/F1-design.md",
+        "openair2/COMMON/f1ap_messages_types.h:268-300",
+        "openair2/F1AP/f1ap_cu_ue_context_management.h:11-14",
+        "openair2/F1AP/f1ap_du_ue_context_management.h:11-13",
+        "openair2/F1AP/lib/f1ap_ue_context.h:11-15",
+        "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62",
+        "openair2/F1AP/lib/f1ap_ue_context.c:1008-1014",
+        "openair2/F1AP/lib/f1ap_ue_context.c:1016-1022",
+        "openair2/COMMON/f1ap_messages_types.h:302-310",
+        "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67",
+        "openair2/F1AP/f1ap_du_ue_context_management.c:37-39",
+        "openair2/F1AP/f1ap_du_ue_context_management.c:15-25",
+        "openair2/F1AP/lib/f1ap_ue_context.c:704-710",
+        "openair2/F1AP/lib/f1ap_ue_context.c:712-718",
+        "openair2/COMMON/f1ap_messages_types.h:100-102",
+        "openair2/COMMON/f1ap_messages_types.h:312-318"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
-        "openair2/F1AP/lib/f1ap_rrc_message_transfer.c:decode_initial_ul_rrc_message_transfer",
-        "openair2/F1AP/f1ap_ids.c:cu_exists_f1_ue_data",
-        "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data",
-        "openair2/F1AP/f1ap_ids.c:cu_update_f1_ue_data",
-        "openair2/F1AP/f1ap_common.c:F1AP_get_next_transaction_identifier",
-        "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_SETUP_RESPONSE",
-        "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_send_UE_CONTEXT_SETUP_REQUEST",
-        "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST",
-        "openair2/F1AP/f1ap_du_ue_context_management.c:DU_send_UE_CONTEXT_SETUP_RESPONSE",
-        "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message",
-        "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST",
-        "openair2/F1AP/f1ap_du_interface_management.c:DU_handle_F1_SETUP_RESPONSE",
-        "openair2/RRC/NR/rrc_gNB_cuup.c:rrc_gNB_process_e1_setup_req",
-        "openair2/RRC/NR/rrc_gNB_du.c:dl_rrc_message_transfer"
+        "openair2/F1AP/f1ap_handlers.c:90-128",
+        "openair2/F1AP/f1ap_handlers.c:75-88",
+        "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:26-38",
+        "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62",
+        "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67",
+        "openair2/F1AP/lib/f1ap_ue_context.c:712-769",
+        "openair2/F1AP/lib/f1ap_ue_context.c:1016-1067",
+        "openair2/F1AP/f1ap_ids.c:70-76",
+        "openair2/F1AP/f1ap_ids.c:59-65",
+        "openair2/RRC/NR/rrc_gNB_du.c:248-340",
+        "openair2/RRC/NR/rrc_gNB_du.c:523-529",
+        "openair2/F1AP/f1ap_common.c:16-21",
+        "openair2/F1AP/f1ap_cu_task.c:60-143"
       ],
-      "expected_vs_observed": "Expected behavior dictates that the gNB-CU should only process F1AP procedures like UE Context Setup and initialRRCTransfer after the F1 Setup procedure is fully complete, and it must rigorously validate identifiers such as the DU ID and Transaction ID for all incoming messages. Furthermore, the UE Context Setup procedure should follow a strict request-response flow between the gNB-CU and gNB-DU, with the CU initiating the request and the DU providing the response, and messages should be properly correlated using Transaction IDs. However, the observed behavior shows the gNB-CU incorrectly registering a UE and processing an RRC Setup Success message, even when receiving an initialRRCTransfer with mutated DU ID and Transaction ID, and critically, this occurs before the F1 Setup procedure is complete. This vulnerability allows an attacker to send an incorrect UE Context Setup Request and Success directly to the gNB-CU, in parallel with a mutated initialRRCTransfer and RRC Setup Success, leading to an inconsistent and incorrect UE registration state due to a lack of proper state validation, ID verification, and adherence to message directionality and procedural preconditions."
+      "expected_vs_observed": "The observed behavior shows the gNB-CU processing an initialRRCTransfer with mutated DU ID and Transaction ID, and accepting an attacker-sent UE Context Setup Success out-of-sequence, even though F1 Setup was not complete and a prior UE Context Setup Request had been rejected. The expected behavior is that the gNB-CU should only process F1AP messages after F1 Setup is complete, reject messages with invalid or mutated IDs, and only accept UE Context Setup Success as a direct response to a pending UE Context Setup Request it initiated, thereby enforcing correct message sequencing, ID binding, and F1 interface state."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-CU exhibits critical implementation flaws by failing to enforce fundamental F1AP procedural preconditions and identifier validations. It processes UE Context Setup and initialRRCTransfer messages before the F1 Setup procedure is complete, violating a core prerequisite. Furthermore, it accepts and processes initialRRCTransfer messages containing mutated DU ID and Transaction ID, indicating a severe lack of validation for these crucial identifiers. The gNB-CU also incorrectly processes UE Context Setup Request and Response messages when sent by an attacker, disregarding the specified message directionality (CU initiates Request, DU sends Response). These failures collectively lead to an incorrect and inconsistent UE registration state, allowing an attacker to manipulate the gNB-CU's operational state.",
+      "rationale": "The gNB-CU exhibits critical vulnerabilities by processing F1AP messages prematurely (before F1 Setup is complete), accepting out-of-sequence messages (UE Context Setup Success without a pending request), and failing to validate critical identifiers (mutated DU ID and Transaction ID in initialRRCTransfer). This indicates a severe lack of robust state management, message sequencing enforcement, and ID validation, leading to an exploitable inconsistent state.",
       "citations": {
         "spec": [
-          "8.3.1 UE Context Setup",
-          "8.3.1.2 Successful Operation",
-          "9.2.2.1 UE CONTEXT SETUP REQUEST",
-          "9.2.2.2 UE CONTEXT SETUP RESPONSE",
-          "9.3.1.5 gNB-DU UE F1AP ID",
-          "9.3.1.23 Transaction ID"
+          "doc/F1AP/F1-design.md",
+          "openair2/COMMON/f1ap_messages_types.h:268-300",
+          "openair2/F1AP/f1ap_cu_ue_context_management.h:11-14",
+          "openair2/F1AP/f1ap_du_ue_context_management.h:11-13",
+          "openair2/F1AP/lib/f1ap_ue_context.h:11-15",
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62",
+          "openair2/F1AP/lib/f1ap_ue_context.c:1008-1014",
+          "openair2/F1AP/lib/f1ap_ue_context.c:1016-1022",
+          "openair2/COMMON/f1ap_messages_types.h:302-310",
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67",
+          "openair2/F1AP/f1ap_du_ue_context_management.c:37-39",
+          "openair2/F1AP/f1ap_du_ue_context_management.c:15-25",
+          "openair2/F1AP/lib/f1ap_ue_context.c:704-710",
+          "openair2/F1AP/lib/f1ap_ue_context.c:712-718",
+          "openair2/COMMON/f1ap_messages_types.h:100-102",
+          "openair2/COMMON/f1ap_messages_types.h:312-318"
         ],
         "code": [
-          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
-          "openair2/F1AP/lib/f1ap_rrc_message_transfer.c:decode_initial_ul_rrc_message_transfer",
-          "openair2/F1AP/f1ap_ids.c:cu_exists_f1_ue_data",
-          "openair2/F1AP/f1ap_ids.c:cu_get_f1_ue_data",
-          "openair2/F1AP/f1ap_ids.c:cu_update_f1_ue_data",
-          "openair2/F1AP/f1ap_common.c:F1AP_get_next_transaction_identifier",
-          "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_handle_UE_CONTEXT_SETUP_RESPONSE",
-          "openair2/F1AP/f1ap_cu_ue_context_management.c:CU_send_UE_CONTEXT_SETUP_REQUEST",
-          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST",
-          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_send_UE_CONTEXT_SETUP_RESPONSE",
-          "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message",
-          "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST",
-          "openair2/F1AP/f1ap_du_interface_management.c:DU_handle_F1_SETUP_RESPONSE",
-          "openair2/RRC/NR/rrc_gNB_cuup.c:rrc_gNB_process_e1_setup_req",
-          "openair2/RRC/NR/rrc_gNB_du.c:dl_rrc_message_transfer"
+          "openair2/F1AP/f1ap_handlers.c:90-128",
+          "openair2/F1AP/f1ap_handlers.c:75-88",
+          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:26-38",
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:51-62",
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:64-67",
+          "openair2/F1AP/lib/f1ap_ue_context.c:712-769",
+          "openair2/F1AP/lib/f1ap_ue_context.c:1016-1067",
+          "openair2/F1AP/f1ap_ids.c:70-76",
+          "openair2/F1AP/f1ap_ids.c:59-65",
+          "openair2/RRC/NR/rrc_gNB_du.c:248-340",
+          "openair2/RRC/NR/rrc_gNB_du.c:523-529",
+          "openair2/F1AP/f1ap_common.c:16-21",
+          "openair2/F1AP/f1ap_cu_task.c:60-143"
         ]
       },
       "suggested_repro": [
-        "1. Initiate the F1 Setup procedure between gNB-CU and gNB-DU, but ensure it does not complete.",
-        "2. As an attacker, simultaneously perform the following actions targeting the gNB-CU:",
-        "   a. Send an incorrect 'UE Context Setup Request' message.",
-        "   b. Immediately follow with a 'UE Context Setup Success' message.",
-        "   c. In parallel, send an 'initialRRCTransfer' message with a mutated DU ID and a mutated Transaction ID.",
-        "   d. Follow with an 'RRC Setup Success' message.",
-        "3. Observe that the gNB-CU registers the UE and processes the RRC Setup Success, leading to an incorrect and inconsistent UE registration state, despite the F1 Setup not being complete and critical IDs being mutated."
+        "1. Ensure F1 Setup is NOT complete between gNB-CU and Attacker (acting as gNB-DU).",
+        "2. Attacker (gNB-DU) sends F1AP: UE Context Setup Request to gNB-CU.",
+        "3. gNB-CU responds with F1AP: UE Context Setup Failure.",
+        "4. Attacker (gNB-DU) then sends F1AP: UE Context Setup Success to gNB-CU (out-of-sequence, without a pending request).",
+        "5. Attacker (gNB-DU) sends F1AP: Initial UL RRC Message Transfer with mutated DU ID and Transaction ID.",
+        "6. Observe gNB-CU processing the initialRRCTransfer despite invalid IDs and the prior out-of-sequence UE Context Setup Success."
       ],
       "risks": [
-        "Incorrect UE Registration State: Leads to inconsistent network state, potential service disruption for legitimate UEs, or resource allocation issues.",
-        "Denial of Service (DoS): An attacker could flood the gNB-CU with malformed messages, causing resource exhaustion or crashes.",
-        "Impersonation/Spoofing: By manipulating IDs, an attacker might be able to impersonate a legitimate DU or UE, leading to unauthorized access or control.",
-        "Security Bypass: Bypassing F1 Setup completion and ID validation could allow an attacker to inject arbitrary RRC messages or manipulate UE contexts."
+        "Denial of Service (DoS) due to unexpected message processing and state inconsistencies.",
+        "Impersonation or spoofing of legitimate DUs/UEs by exploiting invalid ID acceptance.",
+        "Data plane manipulation or misrouting by processing RRC messages with incorrect identifiers.",
+        "Security bypass by accepting F1AP messages before F1 Setup is complete, circumventing initial security checks.",
+        "Unpredictable gNB-CU behavior and potential crashes due to corrupted internal state."
       ],
       "next_steps": [
-        "Implement strict validation for DU ID and Transaction ID in all F1AP messages, especially 'initialRRCTransfer' and 'UE Context Setup' messages.",
-        "Enforce F1 Setup completion as a mandatory precondition for processing any F1AP UE-related procedures (e.g., UE Context Setup, RRC message transfers).",
-        "Validate the directionality and source of F1AP messages, ensuring that 'UE Context Setup Request' is only initiated by the CU and 'UE Context Setup Response' is only received from the DU.",
-        "Add state management to ensure proper pairing and correlation of request/response messages using Transaction IDs.",
-        "Conduct thorough testing, including fuzzing and negative testing, for F1AP message handling, especially concerning state transitions and ID validation."
+        "Implement strict F1 Setup state checks to prevent F1AP message processing before F1 Setup completion.",
+        "Enforce robust request/response pairing for F1AP procedures, rejecting out-of-sequence responses like UE Context Setup Success.",
+        "Implement comprehensive validation for all F1AP IDs (e.g., DU ID, Transaction ID) and reject messages with mutated or invalid identifiers.",
+        "Strengthen the gNB-CU's F1AP state machine to prevent transitions to inconsistent states based on malformed or out-of-sequence messages.",
+        "Enhance error handling and logging for invalid F1AP messages to improve detection and debugging capabilities.",
+        "Conduct a thorough security audit of the gNB-CU's F1AP message processing and state management logic."
       ]
     }
   }
