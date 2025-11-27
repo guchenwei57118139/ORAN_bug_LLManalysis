@@ -3,11 +3,14 @@
     "bug_card": {
       "observed_behavior": "gNB-CU hangs when receiving UE Context Release Complete with mutated DU ID.",
       "interface_guess": [
-        "F1AP"
+        "F1AP",
+        "RRC"
       ],
       "procedure_guess": [
-        "UE Context Release",
-        "UE Context Modification"
+        "UE Context Release Complete",
+        "UE Context Modification",
+        "UE release",
+        "DLRRCMessage Transfer"
       ],
       "components_involved": [
         "gNB-CU",
@@ -15,8 +18,8 @@
         "UE"
       ],
       "key_ids": {
-        "du_id": "mutated",
-        "rnti": "incorrect"
+        "du_id": "mutated DU ID",
+        "rnti": "incorrect value"
       },
       "signals_or_timers": [
         "UE Context Release Complete",
@@ -29,14 +32,19 @@
     "candidate_spec_sections": [
       {
         "Keywords": [
-          "UE CONTEXT RELEASE COMPLETE",
-          "message definition",
-          "gNB-DU UE F1AP ID",
+          "UE Context Release Complete",
+          "gNB-DU",
+          "gNB-CU",
+          "F1AP",
+          "Message Type",
           "gNB-CU UE F1AP ID",
-          "Criticality Diagnostics"
+          "gNB-DU UE F1AP ID",
+          "Criticality Diagnostics",
+          "F1 connection",
+          "UE-associated logical connection"
         ],
         "title": [
-          "9.2.2.6 UE CONTEXT RELEASE COMPLETE"
+          "\u00a79.2.2.6 UE CONTEXT RELEASE COMPLETE"
         ]
       },
       {
@@ -45,82 +53,127 @@
           "UE association",
           "F1 interface",
           "gNB-DU",
-          "mutated ID"
+          "unique identification",
+          "integer"
         ],
         "title": [
-          "9.3.1.5 gNB-DU UE F1AP ID"
-        ]
-      },
-      {
-        "Keywords": [
-          "Cause IE",
-          "error reporting",
-          "F1AP protocol",
-          "Radio Network Layer cause",
-          "Protocol cause",
-          "Unknown or inconsistent pair of UE F1AP ID",
-          "Abstract Syntax Error (Falsely Constructed Message)",
-          "Semantic Error"
-        ],
-        "title": [
-          "9.3.1.2 Cause"
+          "\u00a79.3.1.5 gNB-DU UE F1AP ID"
         ]
       },
       {
         "Keywords": [
           "Criticality Diagnostics",
-          "error handling",
+          "gNB-DU",
+          "gNB-CU",
+          "message comprehension",
           "logical errors",
-          "not comprehended",
           "missing IEs",
-          "gNB-CU hangs"
+          "error reporting",
+          "Procedure Code",
+          "Triggering Message",
+          "Procedure Criticality",
+          "Transaction ID",
+          "Information Element Criticality Diagnostics",
+          "IE Criticality",
+          "IE ID",
+          "Type of Error"
         ],
         "title": [
-          "9.3.1.3 Criticality Diagnostics"
+          "\u00a79.3.1.3 Criticality Diagnostics"
         ]
       },
       {
         "Keywords": [
-          "UE Context Release",
-          "gNB-CU initiated",
-          "UE CONTEXT RELEASE COMMAND",
-          "UE CONTEXT RELEASE COMPLETE",
-          "Successful Operation",
-          "Abnormal Conditions"
+          "UE Context Release Command",
+          "UE Context Release Complete",
+          "gNB-DU",
+          "gNB-CU",
+          "signalling resources",
+          "user data transport resources",
+          "RRC_INACTIVE",
+          "CG-SDT"
         ],
         "title": [
-          "8.3.3 UE Context Release (gNB-CU initiated)"
+          "\u00a78.3.3.2 Successful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Modification Failure",
+          "gNB-DU",
+          "gNB-CU",
+          "context modification failure",
+          "Cause",
+          "Criticality Diagnostics",
+          "gNB-CU UE F1AP ID",
+          "gNB-DU UE F1AP ID",
+          "Requested Target Cell ID"
+        ],
+        "title": [
+          "\u00a79.2.2.9 UE CONTEXT MODIFICATION FAILURE"
+        ]
+      },
+      {
+        "Keywords": [
+          "Cause",
+          "F1AP protocol",
+          "reason",
+          "event",
+          "not supported",
+          "not available",
+          "Radio Network Layer",
+          "Transport Layer",
+          "Protocol",
+          "Misc",
+          "Unspecified",
+          "RL failure",
+          "Unknown or already allocated gNB-DU UE F1AP ID",
+          "Unknown or inconsistent pair of UE F1AP ID",
+          "logical error"
+        ],
+        "title": [
+          "\u00a79.3.1.2 Cause"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-CU should not hang. Upon receiving a UE CONTEXT RELEASE COMPLETE message with a mutated gNB-DU UE F1AP ID, the gNB-CU should detect the invalid or inconsistent ID. It should then handle this error gracefully, potentially logging a Criticality Diagnostics and terminating the UE context release procedure without entering a hung state. The specific cause reported could be \"Unknown or inconsistent pair of UE F1AP ID\" or a \"Semantic Error\" depending on the nature of the mutation."
+    "expected_behaviour": "Upon receiving a UE Context Release Complete message with a mutated gNB-DU UE F1AP ID, the gNB-CU is expected to detect the invalid or unknown ID. It should not hang, but instead handle the error gracefully, potentially by logging the issue and sending an F1AP Error Indication message containing a Criticality Diagnostics IE with a Cause value indicating 'Unknown or inconsistent pair of UE F1AP ID' or a similar logical error, as per F1AP protocol specifications."
   },
   "step3": {
     "candidate_code": [
       {
-        "path": "openair2/F1AP/f1ap_cu_handler.c",
-        "function_name": "f1ap_cu_handle_ue_context_release_complete",
-        "reason": "This function is the primary handler for the UE Context Release Complete message on the gNB-CU. The observed hang occurs during the processing of this message, making it the most likely place for the root cause related to mutated DU ID handling or subsequent error paths."
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_handle_UE_CONTEXT_RELEASE_COMPLETE",
+        "reason": "This function is the direct handler on the gNB-CU for the 'UE Context Release Complete' message. The observed behavior 'gNB-CU hangs' indicates an issue during the processing of this message, likely due to insufficient validation of the 'mutated DU ID' before further processing or passing to RRC."
       },
       {
-        "path": "openair2/F1AP/f1ap_decoder.c",
-        "function_name": "f1ap_decode_ue_context_release_complete",
-        "reason": "The mutated gNB-DU UE F1AP ID would be parsed and extracted by this decoding function. An error in its validation or a failure to correctly identify and flag the mutated ID during decoding could lead to the gNB-CU hanging later in the processing chain."
+        "path": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "function_name": "decode_ue_context_rel_cplt",
+        "reason": "This function is responsible for decoding the 'UE Context Release Complete' message. The 'mutated DU ID' would be parsed here. It's crucial to ensure correct parsing and handling of potentially malformed or invalid IDs before they are used by the CU logic."
       },
       {
-        "path": "openair2/F1AP/f1ap_cu_handler.c",
-        "function_name": "f1ap_cu_validate_ue_f1ap_ids",
-        "reason": "This (or a similar) function would be responsible for validating the consistency and correctness of the gNB-DU UE F1AP ID, especially when paired with the gNB-CU UE F1AP ID. A failure to properly detect or handle a 'mutated' ID here is a direct cause for the observed hang."
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_get_f1_ue_data",
+        "reason": "The 'mutated DU ID' suggests an issue with identifying or validating the UE context on the CU side. This function is used to retrieve UE-specific F1AP data, including the gNB-DU UE F1AP ID, which would be essential for validating the received ID against known active UEs."
       },
       {
-        "path": "openair2/F1AP/f1ap_cu_handler.c",
-        "function_name": "f1ap_cu_process_f1ap_message",
-        "reason": "This is the generic F1AP message dispatcher on the gNB-CU. It's important to check how incoming messages, including UE Context Release Complete, are initially received, sanity-checked, and routed to specific handlers. A fundamental issue here could contribute to the hang."
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_exists_f1_ue_data",
+        "reason": "Similar to 'cu_get_f1_ue_data', this function checks for the existence of a UE's F1AP context. A 'mutated DU ID' could lead to a failed lookup, which might not be handled gracefully, causing the CU to hang."
       },
       {
-        "path": "openair2/F1AP/f1ap_common.c",
-        "function_name": "f1ap_generate_criticality_diagnostics",
-        "reason": "The gNB-CU 'hangs' instead of gracefully handling the error. This suggests a failure in the error reporting mechanism, specifically the generation and sending of Criticality Diagnostics as per F1AP specifications. This function (if it exists) would be crucial for proper error recovery."
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "This is the central message dispatcher for F1AP. It's important to verify that the 'UE Context Release Complete' message is correctly identified and routed to the appropriate handler ('CU_handle_UE_CONTEXT_RELEASE_COMPLETE')."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
+        "function_name": "CU_handle_UL_RRC_MESSAGE_TRANSFER",
+        "reason": "Although for a different message type, this function contains explicit validation logic for 'gNB_DU_ue_id' (`if (ue_data.secondary_ue != msg.gNB_DU_ue_id)`). This pattern might be missing or incorrectly implemented in the 'UE Context Release Complete' handler, serving as a reference for potential fixes."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_handle_UE_CONTEXT_MODIFICATION_REQUIRED",
+        "reason": "This function also handles messages involving 'gNB_DU_ue_id' and 'gNB_CU_ue_id' and includes validation logic (`if (ue_data.secondary_ue != msg.gNB_DU_ue_id)`). It provides another example of how ID validation is performed for UE-associated procedures on the CU."
       }
     ]
   },
@@ -128,280 +181,236 @@
     "snippets": [
       {
         "kind": "spec",
-        "source": "9.2.2.6 UE CONTEXT RELEASE COMPLETE",
-        "location": "9.2.2.6 UE CONTEXT RELEASE COMPLETE",
-        "text": "This section defines the 'UE CONTEXT RELEASE COMPLETE' message. Key elements include the message definition itself, the gNB-DU UE F1AP ID, the gNB-CU UE F1AP ID, and Criticality Diagnostics. It details the structure and purpose of this F1AP message, which is crucial for understanding the context release procedure."
+        "source": "\u00a79.2.2.6 UE CONTEXT RELEASE COMPLETE",
+        "location": "\u00a79.2.2.6"
       },
       {
         "kind": "spec",
-        "source": "9.3.1.5 gNB-DU UE F1AP ID",
-        "location": "9.3.1.5 gNB-DU UE F1AP ID",
-        "text": "This section describes the 'gNB-DU UE F1AP ID'. It is crucial for UE association over the F1 interface between the gNB-DU and gNB-CU. The concept of a 'mutated ID' is relevant here, indicating potential issues with ID consistency or integrity that could lead to abnormal behavior."
+        "source": "The gNB-DU UE F1AP ID IE is used to identify the UE-associated logical F1-connection on the F1 interface at the gNB-DU. The gNB-DU allocates the gNB-DU UE F1AP ID. The gNB-DU UE F1AP ID is unique within the gNB-DU.",
+        "location": "\u00a79.3.1.5"
       },
       {
         "kind": "spec",
-        "source": "9.3.1.2 Cause",
-        "location": "9.3.1.2 Cause",
-        "text": "This section defines the 'Cause IE' used for error reporting in the F1AP protocol. It categorizes causes into Radio Network Layer cause and Protocol cause. Specific causes mentioned include 'Unknown or inconsistent pair of UE F1AP ID', 'Abstract Syntax Error (Falsely Constructed Message)', and 'Semantic Error', which are critical for diagnosing protocol issues and preventing hangs."
+        "source": "The Cause IE indicates the reason for a particular event for the F1AP protocol. When the Cause IE is used, the following values are defined: ... Radio Network Layer: ... Unknown or already allocated gNB-DU UE F1AP ID ... Unknown or inconsistent pair of UE F1AP ID ...",
+        "location": "\u00a79.3.1.2"
       },
       {
         "kind": "spec",
-        "source": "9.3.1.3 Criticality Diagnostics",
-        "location": "9.3.1.3 Criticality Diagnostics",
-        "text": "This section details 'Criticality Diagnostics', an essential mechanism for error handling in F1AP. It addresses logical errors such as 'not comprehended' messages or missing IEs. Proper implementation prevents scenarios like the gNB-CU hanging due to unhandled protocol errors, ensuring robust system operation."
-      },
-      {
-        "kind": "spec",
-        "source": "8.3.3 UE Context Release (gNB-CU initiated)",
-        "location": "8.3.3 UE Context Release (gNB-CU initiated)",
-        "text": "This section outlines the 'UE Context Release' procedure initiated by the gNB-CU. It covers the successful operation involving 'UE CONTEXT RELEASE COMMAND' and 'UE CONTEXT RELEASE COMPLETE' messages, as well as handling 'Abnormal Conditions'. This procedure is central to managing UE resources and ensuring proper state transitions."
+        "source": "The Criticality Diagnostics IE is sent by a node in response to a F1AP message whenever a message is received which contains IEs or IE groups that are not comprehended or are inconsistently encoded, or when IEs are missing from the message in contradiction to the criticality definition for that IE or IE group, or whenever logical errors occur. This IE contains information about which IEs are not comprehended or are inconsistently encoded, or are missing.",
+        "location": "\u00a79.3.1.3"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_cu_handler.c",
-        "location": "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_handle_ue_context_release_complete",
-        "text": "The function `f1ap_cu_handle_ue_context_release_complete` in `openair2/F1AP/f1ap_cu_handler.c` is the primary handler for the UE Context Release Complete message on the gNB-CU. The observed hang occurs during its processing, making it the most likely place for the root cause related to mutated DU ID handling or subsequent error paths."
+        "source": "int CU_handle_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu){f1ap_ue_context_rel_cplt_t cplt = {0};if (!decode_ue_context_rel_cplt(pdu, &cplt)) {LOG_E(F1AP, \"cannot decode F1 UE Context Release Complete\\n\");free_ue_context_rel_cplt(&cplt);return -1;}MessageDef *msg_p = itti_alloc_new_message(TASK_DU_F1, 0,  F1AP_UE_CONTEXT_RELEASE_COMPLETE);msg_p->ittiMsgHeader.originInstance = assoc_id;F1AP_UE_CONTEXT_RELEASE_COMPLETE(msg_p) = cplt;itti_send_msg_to_task(TASK_RRC_GNB, instance, msg_p);return 0;}",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c:140-153"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_decoder.c",
-        "location": "openair2/F1AP/f1ap_decoder.c:f1ap_decode_ue_context_release_complete",
-        "text": "The `f1ap_decode_ue_context_release_complete` function in `openair2/F1AP/f1ap_decoder.c` is responsible for parsing and extracting the gNB-DU UE F1AP ID. An error in its validation or a failure to correctly identify and flag a mutated ID during decoding could lead to the gNB-CU hanging later in the processing chain."
+        "source": "bool decode_ue_context_rel_cplt(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context_rel_cplt_t *out){DevAssert(out != NULL);memset(out, 0, sizeof(*out));F1AP_UEContextReleaseComplete_t *in = &pdu->choice.successfulOutcome->value.choice.UEContextReleaseComplete;F1AP_UEContextReleaseCompleteIEs_t *ie;F1AP_LIB_FIND_IE(F1AP_UEContextReleaseCompleteIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID, true);F1AP_LIB_FIND_IE(F1AP_UEContextReleaseCompleteIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID, true);for (int i = 0; i < in->protocolIEs.list.count; ++i) {ie = in->protocolIEs.list.array[i];AssertError(ie != NULL, return false, \"in->protocolIEs.list.array[i] is NULL\");switch (ie->id) {case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:_F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCompleteIEs__value_PR_GNB_CU_UE_F1AP_ID);out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;break;case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:_F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCompleteIEs__value_PR_GNB_DU_UE_F1AP_ID);out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;break;default:PRINT_ERROR(\"F1AP_ProtocolIE_ID_id %ld unknown, skipping\\n\", ie->id);break;}}return true;}",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:1205-1237"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_cu_handler.c",
-        "location": "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_validate_ue_f1ap_ids",
-        "text": "The function `f1ap_cu_validate_ue_f1ap_ids` (or similar) in `openair2/F1AP/f1ap_cu_handler.c` would validate the consistency of the gNB-DU UE F1AP ID, especially when paired with the gNB-CU UE F1AP ID. A failure to properly detect or handle a 'mutated' ID here is a direct cause for the observed gNB-CU hang."
+        "source": "static f1_ue_data_t *get_hashtable_data(hash_table_t *ht, uint64_t ue_id){void *data = NULL;hashtable_rc_t ret = hashtable_get(ht, ue_id, &data);AssertFatal(ret == HASH_TABLE_OK && data != NULL, \"element for ue_id %ld not found\\n\", ue_id);return data;}f1_ue_data_t cu_get_f1_ue_data(uint32_t ue_id){pthread_mutex_lock(&cu2du_mutex);DevAssert(cu2du_ue_mapping != NULL);f1_ue_data_t ued = *get_hashtable_data(cu2du_ue_mapping, ue_id);pthread_mutex_unlock(&cu2du_mutex);return ued;}",
+        "location": "openair2/F1AP/f1ap_ids.c:17-23,60-66"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_cu_handler.c",
-        "location": "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_process_f1ap_message",
-        "text": "The `f1ap_cu_process_f1ap_message` function in `openair2/F1AP/f1ap_cu_handler.c` is the generic F1AP message dispatcher on the gNB-CU. It's crucial to check how incoming messages, including UE Context Release Complete, are initially received, sanity-checked, and routed to specific handlers. A fundamental issue here could contribute to the hang."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_common.c",
-        "location": "openair2/F1AP/f1ap_common.c:f1ap_generate_criticality_diagnostics",
-        "text": "The function `f1ap_generate_criticality_diagnostics` in `openair2/F1AP/f1ap_common.c` (if it exists) is crucial for proper error recovery. The gNB-CU 'hanging' instead of gracefully handling the error suggests a failure in the error reporting mechanism, specifically the generation and sending of Criticality Diagnostics as per F1AP specifications."
+        "source": "int CU_handle_UL_RRC_MESSAGE_TRANSFER(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu){if (!cu_exists_f1_ue_data(msg.gNB_CU_ue_id)) {LOG_E(F1AP, \"unknown CU UE ID %d\\n\", msg.gNB_CU_ue_id);free_ul_rrc_message_transfer(&msg);return -1;}f1_ue_data_t ue_data = cu_get_f1_ue_data(msg.gNB_CU_ue_id);if (ue_data.secondary_ue != msg.gNB_DU_ue_id) {LOG_E(F1AP, \"unexpected DU UE ID %u received, expected it to be %u\\n\", ue_data.secondary_ue, msg.gNB_DU_ue_id);free_ul_rrc_message_transfer(&msg);return -1;}return 0;}",
+        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:90-108"
       }
     ]
   },
   "step5": {
     "sequence_diagram": [
       {
-        "from": "gNB-CU",
-        "to": "gNB-DU",
-        "message": "UE CONTEXT RELEASE COMMAND",
-        "precond": "UE Context established on gNB-CU and gNB-DU."
-      },
-      {
         "from": "gNB-DU",
         "to": "gNB-CU",
-        "message": "UE CONTEXT RELEASE COMPLETE",
-        "precond": "gNB-DU received UE CONTEXT RELEASE COMMAND and released resources.",
-        "postcond": "Message contains a mutated gNB-DU UE F1AP ID."
+        "message": "UE Context Release Complete",
+        "precond": "gNB-DU initiates UE context release for a UE.",
+        "postcond": "gNB-CU receives the message containing a mutated gNB-DU UE F1AP ID."
       },
       {
         "from": "gNB-CU (F1AP layer)",
-        "to": "gNB-CU (F1AP layer)",
-        "message": "Receive and Decode UE Context Release Complete",
-        "precond": "gNB-CU receives the message.",
-        "postcond": "gNB-DU UE F1AP ID is extracted, potentially mutated."
+        "to": "gNB-CU (RRC layer)",
+        "message": "Forward UE Context Release Complete",
+        "precond": "F1AP layer successfully decodes the message, including the mutated gNB-DU UE F1AP ID, without explicit logical validation.",
+        "postcond": "RRC layer receives the decoded message for further processing."
       },
       {
-        "from": "gNB-CU (F1AP layer)",
-        "to": "gNB-CU (F1AP layer)",
-        "message": "Validate F1AP IDs",
-        "precond": "gNB-DU UE F1AP ID is extracted.",
-        "postcond": "Validation logic fails to gracefully handle the mutated ID, leading to an unrecoverable state."
+        "from": "gNB-CU (RRC layer)",
+        "to": "gNB-CU (F1AP ID management)",
+        "message": "Lookup UE Context Data",
+        "precond": "RRC layer attempts to retrieve UE context using the provided gNB-CU UE F1AP ID or gNB-DU UE F1AP ID.",
+        "postcond": "The lookup function (e.g., get_hashtable_data) is invoked with an ID that does not exist in the CU's mapping table."
       },
       {
-        "from": "gNB-CU (F1AP layer)",
-        "to": "gNB-CU (System)",
-        "message": "Hang",
-        "precond": "Validation of F1AP IDs failed due to mutated DU ID.",
-        "postcond": "gNB-CU becomes unresponsive, failing to process further messages or recover."
+        "from": "gNB-CU (F1AP ID management)",
+        "to": "gNB-CU",
+        "message": "AssertFatal / System Halt",
+        "precond": "The lookup function encounters an unknown UE ID, triggering an AssertFatal.",
+        "postcond": "The gNB-CU process terminates or hangs, leading to the observed behavior."
       }
     ],
     "state_machine": {
       "states": [
-        "UE Context Active",
-        "Release Initiated",
-        "Waiting for Release Complete",
-        "Processing Release Complete",
-        "Invalid ID Detected",
-        "Hanged",
-        "UE Context Inactive"
+        "Idle",
+        "UE Context Establishing",
+        "UE Context Established",
+        "UE Context Releasing",
+        "UE Context Release Complete Received",
+        "Error State",
+        "System Halted"
       ],
       "transitions": [
         {
-          "from": "UE Context Active",
-          "to": "Release Initiated",
-          "on": "gNB-CU sends UE CONTEXT RELEASE COMMAND"
+          "from": "Idle",
+          "to": "UE Context Establishing",
+          "on": "UE Context Setup Request"
         },
         {
-          "from": "Release Initiated",
-          "to": "Waiting for Release Complete",
-          "on": "UE CONTEXT RELEASE COMMAND sent"
+          "from": "UE Context Establishing",
+          "to": "UE Context Established",
+          "on": "UE Context Setup Response"
         },
         {
-          "from": "Waiting for Release Complete",
-          "to": "Processing Release Complete",
-          "on": "UE CONTEXT RELEASE COMPLETE received"
+          "from": "UE Context Established",
+          "to": "UE Context Releasing",
+          "on": "UE Context Release Request (from CU or DU)"
         },
         {
-          "from": "Processing Release Complete",
-          "to": "Invalid ID Detected",
-          "on": "Decode/Validate F1AP IDs",
-          "guard": "gNB-DU UE F1AP ID is mutated"
+          "from": "UE Context Releasing",
+          "to": "UE Context Release Complete Received",
+          "on": "UE Context Release Complete (from DU)"
         },
         {
-          "from": "Processing Release Complete",
-          "to": "UE Context Inactive",
-          "on": "Decode/Validate F1AP IDs",
+          "from": "UE Context Release Complete Received",
+          "to": "System Halted",
+          "on": "Process UE Context Release Complete",
+          "guard": "gNB-DU UE F1AP ID is mutated/unknown"
+        },
+        {
+          "from": "UE Context Release Complete Received",
+          "to": "Idle",
+          "on": "Process UE Context Release Complete",
           "guard": "gNB-DU UE F1AP ID is valid"
         },
         {
-          "from": "Invalid ID Detected",
-          "to": "Hanged",
-          "on": "Failure to handle error",
-          "guard": "Criticality Diagnostics not generated/sent"
+          "from": "UE Context Established",
+          "to": "Error State",
+          "on": "Invalid F1AP Message"
         },
         {
-          "from": "Invalid ID Detected",
-          "to": "UE Context Inactive",
-          "on": "Error handled gracefully",
-          "guard": "Criticality Diagnostics generated/sent"
+          "from": "Error State",
+          "to": "Idle",
+          "on": "Error Handled / Recovery"
         }
       ]
     },
     "assumptions": [
-      "The 'mutated DU ID' refers to the gNB-DU UE F1AP ID within the UE CONTEXT RELEASE COMPLETE message.",
-      "The gNB-CU is expected to validate the gNB-DU UE F1AP ID against its internal state to ensure consistency.",
-      "The hang occurs because the gNB-CU fails to detect the mutated ID as an error or, if detected, fails to trigger a graceful error recovery mechanism (e.g., sending Criticality Diagnostics or a Cause IE).",
-      "The gNB-DU correctly initiates the UE CONTEXT RELEASE COMPLETE message, but the ID mutation is an error in its construction or transmission.",
-      "The functions `f1ap_decode_ue_context_release_complete` and `f1ap_cu_validate_ue_f1ap_ids` are key areas where the mutated ID should be identified."
+      "The 'mutated DU ID' refers to a gNB-DU UE F1AP ID that is unknown to the gNB-CU or does not correspond to an active UE context.",
+      "The decode_ue_context_rel_cplt function successfully decodes the message even with a logically invalid gNB-DU UE F1AP ID, as it primarily checks for message format and presence of IEs, not logical validity against existing contexts.",
+      "The gNB-CU 'hangs' due to an unhandled error, likely an `AssertFatal`, when attempting to look up UE context data using the invalid ID.",
+      "The validation of gNB-DU UE F1AP ID for UE Context Release Complete is expected to occur in the RRC layer or a subsequent handler, which then attempts to use the ID for context lookup.",
+      "The `cu2du_ue_mapping` hashtable is the primary data structure used by the gNB-CU to store and retrieve UE context based on UE IDs."
     ],
     "questions": [
-      "What is the exact nature of the 'mutation' in the gNB-DU UE F1AP ID (e.g., syntax error, out-of-range value, ID not matching any active context)?",
-      "At what specific line of code or logical step within `f1ap_cu_handle_ue_context_release_complete` does the gNB-CU hang?",
-      "Is the gNB-CU attempting to dereference a null pointer or access invalid memory when trying to use the mutated ID for context lookup?",
-      "Are any error logs or traces generated by the gNB-CU immediately before it hangs?",
-      "Is the `Criticality Diagnostics` mechanism (as per F1AP spec) being invoked, and if so, why does it not prevent the hang?",
-      "Does the 'incorrect RNTI' mentioned in the bug card also play a role, or is the mutated DU ID the sole trigger for the hang?"
-    ],
-    "review_request": "HumanInLoop_B_required"
+      "What is the exact value or nature of the 'mutated DU ID'? Is it a random value, a previously used ID, or a malformed ID?",
+      "Does the gNB-CU send any F1AP error message (e.g., Error Indication with Criticality Diagnostics or Cause IE) back to the gNB-DU before hanging, as suggested by the F1AP specification?",
+      "At which specific line of code does the gNB-CU 'hang' or crash? This would confirm the exact point of failure (e.g., within `get_hashtable_data` or a subsequent function).",
+      "Is the gNB_CU_UE_F1AP_ID also affected or only the gNB_DU_UE_F1AP_ID in the received message?",
+      "What is the defined expected behavior of the gNB-CU when receiving a UE Context Release Complete message with an unknown or inconsistent gNB-DU UE F1AP ID?"
+    ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "directionality",
+        "name": "Message Directionality (UE Context Release Complete)",
         "result": "PASS",
         "evidence": [
-          "snippets: spec: 8.3.3 UE Context Release (gNB-CU initiated)"
+          "\u00a79.2.2.6 UE CONTEXT RELEASE COMPLETE",
+          "sequence_diagram"
         ]
       },
       {
-        "name": "req/resp pairing",
-        "result": "PASS",
-        "evidence": [
-          "snippets: spec: 8.3.3 UE Context Release (gNB-CU initiated)"
-        ]
-      },
-      {
-        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
+        "name": "ID Binding - gNB-DU UE F1AP ID validation upon reception",
         "result": "FAIL",
         "evidence": [
-          "bug_card: key_ids: du_id: mutated",
-          "sequence_diagram: postcond: Message contains a mutated gNB-DU UE F1AP ID.",
-          "sequence_diagram: postcond: Validation logic fails to gracefully handle the mutated ID, leading to an unrecoverable state.",
-          "state_machine: transitions: from: Processing Release Complete, to: Invalid ID Detected, guard: gNB-DU UE F1AP ID is mutated",
-          "snippets: spec: 9.3.1.5 gNB-DU UE F1AP ID",
-          "snippets: spec: 9.3.1.2 Cause",
-          "snippets: code: openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_validate_ue_f1ap_ids"
+          "bug_card",
+          "sequence_diagram",
+          "state_machine",
+          "openair2/F1AP/f1ap_ue_context.c:1205-1237",
+          "openair2/F1AP/f1ap_ids.c:17-23,60-66",
+          "\u00a79.3.1.2",
+          "\u00a79.3.1.3",
+          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:90-108"
         ]
       },
       {
-        "name": "transaction scoping",
-        "result": "PASS",
+        "name": "Error Handling for Unknown UE IDs",
+        "result": "FAIL",
         "evidence": [
-          "snippets: spec: 8.3.3 UE Context Release (gNB-CU initiated)",
-          "state_machine: states: UE Context Active, Release Initiated, Waiting for Release Complete, Processing Release Complete, UE Context Inactive"
+          "openair2/F1AP/f1ap_ids.c:17-23,60-66",
+          "\u00a79.3.1.2",
+          "\u00a79.3.1.3"
         ]
-      },
-      {
-        "name": "no-pending-request on new request",
-        "result": "UNKNOWN",
-        "evidence": []
-      },
-      {
-        "name": "timer preconditions",
-        "result": "UNKNOWN",
-        "evidence": []
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The gNB-CU hangs because it fails to gracefully handle a mutated gNB-DU UE F1AP ID in the UE CONTEXT RELEASE COMPLETE message. The F1AP specification provides mechanisms for error reporting and recovery, such as the Cause IE (e.g., 'Unknown or inconsistent pair of UE F1AP ID') and Criticality Diagnostics. The implementation's failure to utilize these mechanisms, leading to an unrecoverable state (hang) instead of a controlled error response, indicates a bug in the gNB-CU's error handling logic, specifically in validating F1AP IDs and generating appropriate diagnostics."
+    "rationale": "The gNB-CU's F1AP layer, specifically the UE Context Release Complete message handler, lacks proper validation of the gNB-DU UE F1AP ID against its internal UE context mapping table. While the message is correctly decoded, the subsequent attempt to retrieve UE context data using a potentially mutated or unknown gNB-DU UE F1AP ID triggers an AssertFatal within the get_hashtable_data function. This AssertFatal causes the gNB-CU to hang, which is a critical failure. The F1AP specification explicitly defines error handling mechanisms, such as the Cause IE and Criticality Diagnostics IE, for scenarios involving unknown or inconsistent IDs, indicating that such conditions should be handled gracefully rather than leading to a system halt. The presence of robust ID validation in other message handlers (e.g., CU_handle_UL_RRC_MESSAGE_TRANSFER) further highlights this as a specific oversight in the UE Context Release Complete processing path, making it an implementation bug rather than a spec non-conformance."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "9.2.2.6 UE CONTEXT RELEASE COMPLETE",
-        "9.3.1.5 gNB-DU UE F1AP ID",
-        "9.3.1.2 Cause",
-        "9.3.1.3 Criticality Diagnostics",
-        "8.3.3 UE Context Release (gNB-CU initiated)"
+        "\u00a79.2.2.6",
+        "\u00a79.3.1.5",
+        "\u00a79.3.1.2",
+        "\u00a79.3.1.3"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_handle_ue_context_release_complete",
-        "openair2/F1AP/f1ap_decoder.c:f1ap_decode_ue_context_release_complete",
-        "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_validate_ue_f1ap_ids",
-        "openair2/F1AP/f1ap_common.c:f1ap_generate_criticality_diagnostics"
+        "openair2/F1AP/f1ap_cu_ue_context_management.c:140-153",
+        "openair2/F1AP/lib/f1ap_ue_context.c:1205-1237",
+        "openair2/F1AP/f1ap_ids.c:17-23,60-66",
+        "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:90-108"
       ],
-      "expected_vs_observed": "The gNB-CU is observed to hang upon receiving a UE Context Release Complete message containing a mutated gNB-DU UE F1AP ID. The expected behavior, according to F1AP specifications, is for the gNB-CU to detect such an inconsistent or mutated ID during validation, report the error using mechanisms like the Cause IE or Criticality Diagnostics, and transition to a defined error state or gracefully terminate the procedure, rather than entering an unrecoverable hung state."
+      "expected_vs_observed": "The gNB-CU observed behavior is to hang when receiving a UE Context Release Complete message with a mutated gNB-DU UE F1AP ID. This occurs because the `CU_handle_UE_CONTEXT_RELEASE_COMPLETE` function (openair2/F1AP/f1ap_cu_ue_context_management.c:140-153), after decoding the message (openair2/F1AP/lib/f1ap_ue_context.c:1205-1237), attempts to retrieve UE context data using the potentially invalid ID. The `get_hashtable_data` function (openair2/F1AP/f1ap_ids.c:17-23,60-66) contains an `AssertFatal` that triggers a crash if the UE ID is not found in the hashtable, leading to the observed hang. The expected behavior, as implied by F1AP specifications (\u00a79.3.1.2, \u00a79.3.1.3) and demonstrated by other message handlers like `CU_handle_UL_RRC_MESSAGE_TRANSFER` (openair2/F1AP/f1ap_cu_rrc_message_transfer.c:90-108), is that the gNB-CU should validate the gNB-DU UE F1AP ID upon reception. If the ID is unknown or inconsistent, it should gracefully handle the error, perhaps by logging a warning and discarding the message, or by sending an appropriate F1AP error indication (e.g., Cause IE or Criticality Diagnostics IE), rather than crashing."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-CU implementation fails to gracefully handle a UE Context Release Complete message containing a mutated gNB-DU UE F1AP ID. Instead of detecting the invalid ID, reporting an error (e.g., via Criticality Diagnostics), and transitioning to a defined error state or gracefully terminating the procedure, the gNB-CU enters an unrecoverable hung state. This violates expected error handling and robustness, as indicated by the failed ID binding invariant check.",
+      "rationale": "The gNB-CU crashes (hangs) upon receiving a UE Context Release Complete message containing a mutated or unknown gNB-DU UE F1AP ID. This is due to an AssertFatal call within the `get_hashtable_data` function when attempting to retrieve UE context data with an invalid ID. The F1AP specification implies that unknown IDs should be handled gracefully, for example, by logging an error and discarding the message or sending an F1AP error indication, rather than causing a system crash. This indicates a failure in robust ID validation and error handling within the gNB-CU's F1AP implementation.",
       "citations": {
         "spec": [
-          "9.2.2.6 UE CONTEXT RELEASE COMPLETE",
-          "9.3.1.5 gNB-DU UE F1AP ID",
-          "9.3.1.2 Cause",
-          "9.3.1.3 Criticality Diagnostics",
-          "8.3.3 UE Context Release (gNB-CU initiated)"
+          "\u00a79.2.2.6 UE CONTEXT RELEASE COMPLETE",
+          "\u00a79.3.1.2",
+          "\u00a79.3.1.3"
         ],
         "code": [
-          "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_handle_ue_context_release_complete",
-          "openair2/F1AP/f1ap_cu_handler.c:f1ap_cu_validate_ue_f1ap_ids",
-          "openair2/F1AP/f1ap_decoder.c:f1ap_decode_ue_context_release_complete",
-          "openair2/F1AP/f1ap_common.c:f1ap_generate_criticality_diagnostics"
+          "openair2/F1AP/f1ap_cu_ue_context_management.c:140-153",
+          "openair2/F1AP/lib/f1ap_ue_context.c:1205-1237",
+          "openair2/F1AP/f1ap_ids.c:17-23,60-66",
+          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:90-108"
         ]
       },
       "suggested_repro": [
-        "Establish a UE context between gNB-CU and gNB-DU.",
-        "Initiate a UE Context Release procedure from the gNB-CU.",
-        "Intercept or craft the UE Context Release Complete message sent from the gNB-DU to the gNB-CU.",
-        "Mutate the gNB-DU UE F1AP ID within this message to an invalid or inconsistent value.",
-        "Send the mutated UE Context Release Complete message to the gNB-CU.",
-        "Observe the gNB-CU's behavior; it is expected to hang."
+        "1. Set up a gNB-CU and gNB-DU environment.",
+        "2. Establish a UE context between the gNB-CU and gNB-DU.",
+        "3. Send a UE Context Release Complete message from the gNB-DU to the gNB-CU.",
+        "4. Mutate the gNB-DU UE F1AP ID in the sent message to an invalid or unknown value.",
+        "5. Observe the gNB-CU's behavior; it should hang or crash."
       ],
       "risks": [
-        "Service Disruption: A hung gNB-CU will cease processing traffic and control plane messages, leading to service outages for all UEs it manages.",
-        "Data Loss: Ongoing data transfers for affected UEs will be interrupted and potentially lost.",
-        "Operational Overhead: Requires manual intervention to restart the gNB-CU, increasing operational costs and downtime.",
-        "Security Vulnerability: Could be exploited by a malicious or misconfigured gNB-DU to trigger a denial-of-service attack on the gNB-CU.",
-        "Resource Exhaustion: The hang might be due to an infinite loop or resource leak, leading to CPU/memory exhaustion."
+        "System instability and crashes in the gNB-CU.",
+        "Potential Denial of Service (DoS) if an attacker or misconfigured DU sends malformed messages.",
+        "Loss of service for legitimate UEs if the gNB-CU crashes.",
+        "Increased debugging complexity and recovery time."
       ],
       "next_steps": [
-        "Verify Repro: Confirm the gNB-CU hang using the suggested reproduction steps in a controlled environment.",
-        "Root Cause Analysis: Debug the f1ap_cu_validate_ue_f1ap_ids function and its call chain within f1ap_cu_handle_ue_context_release_complete to pinpoint the exact cause of the hang when an invalid gNB-DU UE F1AP ID is detected.",
-        "Implement Robust Error Handling: Modify the gNB-CU's F1AP handler to correctly detect and handle invalid gNB-DU UE F1AP IDs. This should involve returning an error code, logging the error, potentially sending a Criticality Diagnostics message, and gracefully terminating the UE context without affecting other UEs or the gNB-CU's overall operation.",
-        "Unit Testing: Add unit tests specifically for invalid F1AP ID scenarios in f1ap_cu_validate_ue_f1ap_ids and f1ap_cu_handle_ue_context_release_complete to prevent regressions."
+        "1. Implement robust validation for the gNB-DU UE F1AP ID in the UE Context Release Complete message handler.",
+        "2. Replace the AssertFatal call with graceful error handling (e.g., logging, discarding message, sending F1AP error indication) when an unknown ID is encountered.",
+        "3. Review other F1AP message handlers for similar AssertFatal calls or inadequate ID validation logic.",
+        "4. Add unit and integration tests to cover scenarios involving invalid or unknown F1AP IDs."
       ]
     }
   }

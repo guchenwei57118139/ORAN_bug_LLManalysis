@@ -1,16 +1,15 @@
 {
   "step1": {
     "bug_card": {
-      "observed_behavior": "gNB-CU crashes upon receiving an F1AP Setup Response, following an attacker modifying the RNTI in a UE Context Modification request and sending a DLRRCMessage Transfer after UE release.",
+      "observed_behavior": "gNB-CU crashes when receiving F1AP Setup Response.",
       "interface_guess": [
         "F1AP",
         "RRC"
       ],
       "procedure_guess": [
-        "F1AP Setup",
-        "UE Context Modification",
-        "UE Release",
-        "RRC Message Transfer"
+        "F1AP Setup Procedure",
+        "UE Context Modification Procedure",
+        "UE Release Procedure"
       ],
       "components_involved": [
         "gNB-CU",
@@ -35,207 +34,122 @@
           "F1AP Setup Response",
           "gNB-CU",
           "gNB-DU",
-          "initial setup"
+          "Procedure"
         ],
         "title": [
-          "slice_1_F1AP_Setup.md"
+          "slice_1_F1AP_Setup_Procedure.md"
         ]
       },
       {
         "Keywords": [
           "UE Context Modification",
-          "gNB-CU initiated",
-          "UE CONTEXT MODIFICATION REQUEST",
-          "modify UE Context",
-          "radio resources"
+          "radio resources",
+          "sidelink resources",
+          "gNB-DU",
+          "gNB-CU",
+          "UE Context Modification request"
         ],
         "title": [
-          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)"
+          "slice_2_UE_Context_Modification_Procedure.md",
+          "8.3.4.1 General",
+          "8.3.4.2 Successful Operation"
         ]
       },
       {
         "Keywords": [
-          "UE CONTEXT MODIFICATION REQUEST",
-          "message definition",
-          "Information Element",
-          "gNB-CU UE F1AP ID",
-          "gNB-DU UE F1AP ID",
-          "C-RNTI"
+          "UE Release",
+          "Procedure",
+          "gNB-CU",
+          "gNB-DU",
+          "UE"
         ],
         "title": [
-          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST"
-        ]
-      },
-      {
-        "Keywords": [
-          "DL RRC Message Transfer",
-          "UE-associated signalling",
-          "UE context lookup",
-          "F1-connection establishment",
-          "UE release"
-        ],
-        "title": [
-          "\u00a78.4.2 DL RRC Message Transfer"
-        ]
-      },
-      {
-        "Keywords": [
-          "DL RRC MESSAGE TRANSFER",
-          "message definition",
-          "gNB-DU UE F1AP ID",
-          "old gNB-DU UE F1AP ID",
-          "RRC-Container",
-          "UE Context not retrievable"
-        ],
-        "title": [
-          "\u00a79.2.3.2 DL RRC MESSAGE TRANSFER"
-        ]
-      },
-      {
-        "Keywords": [
-          "UE Context Release Request",
-          "UE release",
-          "UE-associated logical F1-connection",
-          "context cleanup",
-          "UE Context not retrievable"
-        ],
-        "title": [
-          "\u00a78.4.2.2 Successful operation",
-          "Interactions with UE Context Release Request procedure"
+          "slice_3_UE_Release_Procedure.md"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-CU is expected to robustly handle UE Context Modification requests by validating all parameters, including any implicit RNTI-related information, to prevent inconsistent UE contexts. Upon receiving a DL RRC Message Transfer for a released UE, the gNB-DU should either reject the message or initiate a new UE context establishment, and the gNB-CU should handle such scenarios gracefully without crashing. The gNB-CU must also be resilient to unexpected or inconsistent UE states when processing an F1AP Setup Response."
+    "expected_behaviour": "The gNB-CU shall successfully process the F1AP Setup Response message without crashing, establishing the F1AP interface with the gNB-DU."
   },
   "step3": {
     "candidate_code": [
       {
-        "path": "openair2/F1AP/f1ap_handler.c",
-        "function_name": "f1ap_handle_f1ap_setup_response",
-        "reason": "The gNB-CU crashes upon receiving an F1AP Setup Response. This function is the primary entry point for handling this message and needs to be investigated for state corruption or unexpected conditions."
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "The gNB-CU is crashing when receiving an F1AP Setup Response. The `f1ap_handle_message` function dispatches incoming messages based on a table. The current dispatch table `f1ap_messages_processing` incorrectly maps the F1AP Setup procedure's successful outcome (response) to a DU-side handler (`DU_handle_F1_SETUP_RESPONSE`), leading to a crash when invoked on the CU."
       },
       {
-        "path": "openair2/F1AP/f1ap_handler.c",
-        "function_name": "f1ap_handle_ue_context_modification_request",
-        "reason": "The attacker modifies the RNTI in this request. This function processes the request and updates the UE context, making it critical to understand how RNTI changes are handled and validated."
+        "path": "openair2/F1AP/f1ap_du_interface_management.c",
+        "function_name": "DU_handle_F1_SETUP_RESPONSE",
+        "reason": "This function is designed to handle F1AP Setup Responses on the gNB-DU. If it's being invoked on the gNB-CU (as implied by the bug and the dispatch logic in `f1ap_handle_message`), it will operate on incorrect context or data structures, leading to a crash."
       },
       {
-        "path": "openair2/F1AP/f1ap_handler.c",
-        "function_name": "f1ap_handle_dl_rrc_message_transfer",
-        "reason": "This message is sent after UE release and uses the modified RNTI. The function's logic for looking up or validating the UE context, especially after a release, is crucial, as the spec mentions 'UE Context not retrievable'."
+        "path": "openair2/F1AP/f1ap_cu_task.c",
+        "function_name": "F1AP_CU_task",
+        "reason": "This is the main task loop for the gNB-CU. It receives SCTP data indications and dispatches them to `f1ap_handle_message`, which then incorrectly calls a DU-side handler for the F1AP Setup Response, leading to the observed crash."
       },
       {
-        "path": "openair2/F1AP/f1ap_handler.c",
-        "function_name": "f1ap_handle_ue_context_release_request",
-        "reason": "The bug occurs after UE release. This function is responsible for cleaning up UE contexts, and any failure to properly invalidate or remove RNTI associations could lead to stale context issues."
+        "path": "openair2/F1AP/f1ap_cu_interface_management.h",
+        "function_name": "(definitions)",
+        "reason": "This header defines CU-side F1AP interface management functions. The absence of a `CU_handle_F1_SETUP_RESPONSE` function here, while the bug states the CU is *receiving* the response, indicates a missing handler that contributes to the dispatch issue."
       },
       {
-        "path": "openair2/F1AP/f1ap_ue_context.c",
-        "function_name": "f1ap_ue_context_get_by_rnti",
-        "reason": "The bug involves an 'incorrect RNTI' and 'UE Context not retrievable'. This function is likely used to retrieve UE contexts based on RNTI, and its behavior with incorrect or stale RNTIs is critical."
+        "path": "openair2/F1AP/f1ap_common.c",
+        "function_name": "getCxt",
+        "reason": "Contains F1AP context management functions. If a DU-side handler is incorrectly invoked on the CU, it might attempt to access CU-specific context using DU-specific logic, or vice-versa, leading to a crash."
       },
       {
-        "path": "openair2/F1AP/f1ap_ue_context.c",
-        "function_name": "f1ap_ue_context_update_rnti",
-        "reason": "To understand how the RNTI is modified during UE Context Modification and how it's invalidated/removed during UE Release, which is key to identifying if stale RNTI references persist."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_decode.c",
-        "function_name": "f1ap_decode_ue_context_modification_request",
-        "reason": "To verify how the RNTI is extracted from the incoming UE Context Modification Request message and if any validation or bounds checking is performed during decoding."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_decode.c",
-        "function_name": "f1ap_decode_dl_rrc_message_transfer",
-        "reason": "To verify how UE F1AP IDs or RNTI are extracted from the incoming DL RRC Message Transfer, especially when a context might have been released, potentially leading to incorrect lookups."
+        "path": "openair2/F1AP/lib/f1ap_interface_management.c",
+        "function_name": "decode_f1ap_setup_response",
+        "reason": "This function is responsible for decoding the F1AP Setup Response. If the `DU_handle_F1_SETUP_RESPONSE` is called on the CU, it will attempt to decode the message using this function. A crash could occur during the decoding process if the message format is unexpected or corrupted, or if subsequent processing of the decoded message is flawed."
       }
     ]
   },
   "step4": {
     "snippets": [
       {
+        "kind": "code",
+        "source": "static const f1ap_message_processing_t f1ap_messages_processing[][3] = { {DU_handle_RESET, CU_handle_RESET_ACKNOWLEDGE, 0}, /* Reset */ {CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}, /* F1Setup */ {0, 0, 0}, /* ErrorIndication */ {CU_handle_gNB_DU_CONFIGURATION_UPDATE, DU_handle_gNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE, 0}, /* gNBDUConfigurationUpdate */ {DU_handle_gNB_CU_CONFIGURATION_UPDATE, CU_handle_gNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE, 0}, /* gNBCUConfigurationUpdate */ {DU_handle_UE_CONTEXT_SETUP_REQUEST, CU_handle_UE_CONTEXT_SETUP_RESPONSE, 0}, /* UEContextSetup */ {DU_handle_UE_CONTEXT_RELEASE_COMMAND, CU_handle_UE_CONTEXT_RELEASE_COMPLETE, 0}, /* UEContextRelease */ {DU_handle_UE_CONTEXT_MODIFICATION_REQUEST, CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE, 0}, /* UEContextModification */ {CU_handle_UE_CONTEXT_MODIFICATION_REQUIRED, DU_handle_UE_CONTEXT_MODIFICATION_CONFIRM, DU_handle_UE_CONTEXT_MODIFICATION_REFUSE}, /* UEContextModificationRequired */ {0, 0, 0}, /* UEMobilityCommand */ {CU_handle_UE_CONTEXT_RELEASE_REQUEST, 0, 0}, /* UEContextReleaseRequest */ {CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER, 0, 0}, /* InitialULRRCMessageTransfer */ {DU_handle_DL_RRC_MESSAGE_TRANSFER, 0, 0}, /* DLRRCMessageTransfer */ {CU_handle_UL_RRC_MESSAGE_TRANSFER, 0, 0}, /* ULRRCMessageTransfer */ {0, 0, 0}, /* privateMessage */ {0, 0, 0}, /* UEInactivityNotification */ {0, 0, 0}, /* GNBDUResourceCoordination */ {0, 0, 0}, /* SystemInformationDeliveryCommand */ {DU_handle_Paging, 0, 0}, /* Paging */ {0, 0, 0}, /* Notify */ {0, 0, 0}, /* WriteReplaceWarning */ {0, 0, 0}, /* PWSCancel */ {0, 0, 0}, /* PWSRestartIndication */ {0, 0, 0}, /* PWSFailureIndication */ }; const char *f1ap_direction2String(int f1ap_dir) { static const char *const f1ap_direction_String[] = { \"\", /* Nothing */ \"Initiating message\", /* initiating message */ \"Successfull outcome\", /* successfull outcome */ \"UnSuccessfull outcome\", /* successfull outcome */ }; return(f1ap_direction_String[f1ap_dir]); } static F1AP_F1AP_PDU_t *f1ap_decode_pdu(const uint8_t *const buffer, uint32_t length) { DevAssert(buffer != NULL); asn_codec_ctx_t st = {.max_stack_size = 100 * 1000}; F1AP_F1AP_PDU_t *pdu = NULL; asn_dec_rval_t dec_ret = aper_decode(&st, &asn_DEF_F1AP_F1AP_PDU, (void **)&pdu, buffer, length, 0, 0); if (LOG_DEBUGFLAG(DEBUG_ASN1)) { LOG_E(F1AP, \"----------------- ASN1 DECODER PRINT START----------------- \\n\"); xer_fprint(stdout, &asn_DEF_F1AP_F1AP_PDU, pdu); LOG_E(F1AP, \"----------------- ASN1 DECODER PRINT END ----------------- \\n\"); } return dec_ret.code == RC_OK ? pdu : NULL; } int f1ap_handle_message(instance_t instance, sctp_assoc_t assoc_id, int32_t stream, const uint8_t *const data, const uint32_t data_length) { DevAssert(data != NULL); F1AP_F1AP_PDU_t *pdu = f1ap_decode_pdu(data, data_length); if (pdu == NULL) { LOG_E(F1AP, \"Failed to decode PDU\\n\"); return -1; } /* Checking procedure Code and direction of message */ if (pdu->choice.initiatingMessage->procedureCode >= sizeof(f1ap_messages_processing) / (3 * sizeof(f1ap_message_processing_t)) || (pdu->present > F1AP_F1AP_PDU_PR_unsuccessfulOutcome)) { LOG_E(F1AP, \"[SCTP %d] Either procedureCode %ld or direction %d exceed expected\\n\", assoc_id, pdu->choice.initiatingMessage->procedureCode, pdu->present); ASN_STRUCT_FREE(asn_DEF_F1AP_F1AP_PDU, pdu); return -1; } int ret; if (f1ap_messages_processing[pdu->choice.initiatingMessage->procedureCode][pdu->present - 1] == NULL) { // No handler present. This can mean not implemented or no procedure for eNB (wrong direction). LOG_E(F1AP, \"[SCTP %d] No handler for procedureCode %ld in %s\\n\", assoc_id, pdu->choice.initiatingMessage->procedureCode, f1ap_direction2String(pdu->present - 1)); ret=-1; } else { /* Calling the right handler */ LOG_D(F1AP, \"Calling handler with instance %ld\\n\",instance); ret = (*f1ap_messages_processing[pdu->choice.initiatingMessage->procedureCode][pdu->present - 1])(instance, assoc_id, stream, pdu); } ASN_STRUCT_FREE(asn_DEF_F1AP_F1AP_PDU, pdu); return ret; }",
+        "location": "openair2/F1AP/f1ap_handlers.c:36:1"
+      },
+      {
+        "kind": "code",
+        "source": "int DU_handle_F1_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu) { LOG_D(F1AP, \"DU_handle_F1_SETUP_RESPONSE\\n\"); /* Decode */ f1ap_setup_resp_t resp = {0}; if (!decode_f1ap_setup_response(pdu, &resp)) { LOG_E(F1AP, \"cannot decode F1AP Setup Response\\n\"); free_f1ap_setup_response(&resp); return -1; } LOG_D(F1AP, \"Sending F1AP_SETUP_RESP ITTI message\\n\"); f1_setup_response(&resp); // free F1AP message after use free_f1ap_setup_response(&resp); return 0; }",
+        "location": "openair2/F1AP/f1ap_du_interface_management.c:106:1"
+      },
+      {
+        "kind": "code",
+        "source": "void *F1AP_CU_task(void *arg) { MessageDef *received_msg = NULL; int result; LOG_I(F1AP, \"Starting F1AP at CU\\n\"); // no RLC in CU, initialize mem pool for PDCP itti_mark_task_ready(TASK_CU_F1); eth_params_t *IPaddrs; // Hardcoded instance id! IPaddrs = &RC.nrrrc[0]->eth_params_s; const int instance = 0; createF1inst(instance, NULL, NULL); cu_task_send_sctp_init_req(instance, IPaddrs->my_addr); if (RC.nrrrc[instance]->node_type != ngran_gNB_CUCP) { getCxt(instance)->gtpInst = cu_task_create_gtpu_instance(IPaddrs); AssertFatal(getCxt(instance)->gtpInst > 0, \"Failed to create CU F1-U UDP listener\"); } else { LOG_I(F1AP, \"In F1AP connection, don't start GTP-U, as we have also E1AP\\n\"); } // Fixme: fully inconsistent instances management // dirty global var is a bad fix CUuniqInstance=getCxt(instance)->gtpInst; while (1) { itti_receive_msg(TASK_CU_F1, &received_msg); sctp_assoc_t assoc_id = ITTI_MSG_ORIGIN_INSTANCE(received_msg); LOG_D(F1AP, \"CU Task Received %s for instance %ld: sending SCTP message via assoc_id %d\\n\", ITTI_MSG_NAME(received_msg), ITTI_MSG_DESTINATION_INSTANCE(received_msg), assoc_id); switch (ITTI_MSG_ID(received_msg)) { case SCTP_NEW_ASSOCIATION_IND: cu_task_handle_sctp_association_ind(ITTI_MSG_ORIGIN_INSTANCE(received_msg), &received_msg->ittiMsg.sctp_new_association_ind, IPaddrs); break; case SCTP_NEW_ASSOCIATION_RESP: cu_task_handle_sctp_association_resp(ITTI_MSG_DESTINATION_INSTANCE(received_msg), &received_msg->ittiMsg.sctp_new_association_resp); break; case SCTP_DATA_IND: cu_task_handle_sctp_data_ind(ITTI_MSG_DESTINATION_INSTANCE(received_msg), &received_msg->ittiMsg.sctp_data_ind); break; case F1AP_RESET: CU_send_RESET(assoc_id, &F1AP_RESET(received_msg)); free_f1ap_reset(&F1AP_RESET(received_msg)); break; case F1AP_RESET_ACK: CU_send_RESET_ACKNOWLEDGE(assoc_id, &F1AP_RESET_ACK(received_msg)); break; case F1AP_SETUP_RESP: // from rrc CU_send_F1_SETUP_RESPONSE(assoc_id, &F1AP_SETUP_RESP(received_msg)); break; case F1AP_SETUP_FAILURE: CU_send_F1_SETUP_FAILURE(assoc_id, &F1AP_SETUP_FAILURE(received_msg)); break; case F1AP_GNB_CU_CONFIGURATION_UPDATE: // from rrc CU_send_gNB_CU_CONFIGURATION_UPDATE(assoc_id, &F1AP_GNB_CU_CONFIGURATION_UPDATE(received_msg)); break; case F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE: CU_send_gNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(assoc_id, &F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(received_msg)); break; case F1AP_DL_RRC_MESSAGE: // from rrc CU_send_DL_RRC_MESSAGE_TRANSFER(assoc_id, &F1AP_DL_RRC_MESSAGE(received_msg)); free_dl_rrc_message_transfer(&F1AP_DL_RRC_MESSAGE(received_msg)); break; case F1AP_UE_CONTEXT_SETUP_REQ: // from rrc CU_send_UE_CONTEXT_SETUP_REQUEST(assoc_id, &F1AP_UE_CONTEXT_SETUP_REQ(received_msg)); free_ue_context_setup_req(&F1AP_UE_CONTEXT_SETUP_REQ(received_msg)); break; case F1AP_UE_CONTEXT_MODIFICATION_REQ: CU_send_UE_CONTEXT_MODIFICATION_REQUEST(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg)); free_ue_context_mod_req(&F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg)); break; case F1AP_UE_CONTEXT_RELEASE_CMD: // from rrc CU_send_UE_CONTEXT_RELEASE_COMMAND(assoc_id, &F1AP_UE_CONTEXT_RELEASE_CMD(received_msg)); free_ue_context_rel_cmd(&F1AP_UE_CONTEXT_RELEASE_CMD(received_msg)); break; case F1AP_PAGING_IND: CU_send_Paging(assoc_id, &F1AP_PAGING_IND(received_msg)); break; case F1AP_UE_CONTEXT_MODIFICATION_CONFIRM: CU_send_UE_CONTEXT_MODIFICATION_CONFIRM(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_CONFIRM(received_msg)); break; case F1AP_UE_CONTEXT_MODIFICATION_REFUSE: CU_send_UE_CONTEXT_MODIFICATION_REFUSE(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_REFUSE(received_msg)); break; case TERMINATE_MESSAGE: LOG_W(F1AP, \" *** Exiting F1AP thread\\n\"); itti_exit_task(); break; default: LOG_E(F1AP, \"CU Received unhandled message: %d:%s\\n\", ITTI_MSG_ID(received_msg), ITTI_MSG_NAME(received_msg)); break; } // switch result = itti_free (ITTI_MSG_ORIGIN_ID(received_msg), received_msg); AssertFatal (result == EXIT_SUCCESS, \"Failed to free memory (%d)!\\n\", result); received_msg = NULL; } // while destroyF1inst(instance); return NULL; }",
+        "location": "openair2/F1AP/f1ap_cu_task.c:30:1"
+      },
+      {
+        "kind": "code",
+        "source": "/*\n * F1 Setup\n */\nint CU_handle_F1_SETUP_REQUEST(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu);\n\nint CU_send_F1_SETUP_RESPONSE(sctp_assoc_t assoc_id, f1ap_setup_resp_t *f1ap_setup_resp);\n\nint CU_send_F1_SETUP_FAILURE(sctp_assoc_t assoc_id, const f1ap_setup_failure_t *fail);",
+        "location": "openair2/F1AP/f1ap_cu_interface_management.h:26:1"
+      },
+      {
+        "kind": "code",
+        "source": "f1ap_cudu_inst_t *getCxt(instance_t instanceP) { DevAssert(instanceP == 0); return f1_inst[instanceP]; }",
+        "location": "openair2/F1AP/f1ap_common.c:16:1"
+      },
+      {
+        "kind": "code",
+        "source": "bool decode_f1ap_setup_response(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_resp_t *out) { /* Check presence of message type */ _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_successfulOutcome); _F1_EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, F1AP_ProcedureCode_id_F1Setup); _F1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present, F1AP_SuccessfulOutcome__value_PR_F1SetupResponse); /* Check presence of mandatory IEs */ F1AP_F1SetupResponse_t *in = &pdu->choice.successfulOutcome->value.choice.F1SetupResponse; F1AP_F1SetupResponseIEs_t *ie; F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true); F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_GNB_CU_RRC_Version, true); /* Loop over all IEs */ for (int i = 0; i < in->protocolIEs.list.count; i++) { ie = in->protocolIEs.list.array[i]; switch (ie->id) { case F1AP_ProtocolIE_ID_id_TransactionID: // Transaction ID (M) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_TransactionID); AssertError(ie->value.choice.TransactionID != -1, return false, \"ie->value.choice.TransactionID is -1\"); out->transaction_id = ie->value.choice.TransactionID; break; case F1AP_ProtocolIE_ID_id_gNB_CU_Name: { // gNB-CU Name (O) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_GNB_CU_Name); const F1AP_GNB_CU_Name_t *cu_name = &ie->value.choice.GNB_CU_Name; out->gNB_CU_name = calloc_or_fail(cu_name->size + 1, sizeof(*out->gNB_CU_name)); strncpy(out->gNB_CU_name, (char *)cu_name->buf, cu_name->size); } break; case F1AP_ProtocolIE_ID_id_GNB_CU_RRC_Version: // gNB-CU RRC version (M) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_RRC_Version); // RRC Version: \"This IE is not used in this release.\" if (ie->value.choice.RRC_Version.iE_Extensions) { F1AP_ProtocolExtensionContainer_10696P228_t *ext = (F1AP_ProtocolExtensionContainer_10696P228_t *)ie->value.choice.RRC_Version.iE_Extensions; if (ext->list.count > 0) { F1AP_RRC_Version_ExtIEs_t *rrcext = ext->list.array[0]; OCTET_STRING_t *os = &rrcext->extensionValue.choice.OCTET_STRING_SIZE_3_; for (int i = 0; i < sizeofArray(out->rrc_ver); i++) out->rrc_ver[i] = os->buf[i]; } } break; case F1AP_ProtocolIE_ID_id_Cells_to_be_Activated_List: { // Cells to be Activated List (O) if (ie->value.present != F1AP_F1SetupResponseIEs__value_PR_Cells_to_be_Activated_List) break; struct F1AP_Cells_to_be_Activated_List *Cells_to_be_Activated_List = &ie->value.choice.Cells_to_be_Activated_List; out->num_cells_to_activate = Cells_to_be_Activated_List->list.count; // Loop Cells to be Activated List Items (count >= 1) AssertError(out->num_cells_to_activate > 0, return false, \"At least 1 cell must be present\"); for (int i = 0; i < out->num_cells_to_activate; i++) { const F1AP_Cells_to_be_Activated_List_ItemIEs_t *itemIEs = (F1AP_Cells_to_be_Activated_List_ItemIEs_t *)Cells_to_be_Activated_List->list.array[i]; if (!decode_cells_to_activate(&out->cells_to_activate[i], itemIEs)) return false; } break; } default: AssertError(1 == 0, return false, \"F1AP_ProtocolIE_ID_id %ld unknown\\n\", ie->id); break; } } return true; }",
+        "location": "openair2/F1AP/lib/f1ap_interface_management.c:647:1"
+      },
+      {
         "kind": "spec",
-        "source": "slice_1_F1AP_Setup.md",
-        "location": "slice_1_F1AP_Setup.md",
-        "text": "This section describes the F1AP Setup procedure, including the F1AP Setup Response, which is crucial for the initial setup between the gNB-CU and gNB-DU. It covers the establishment of the F1 interface and the exchange of necessary information for initial communication."
+        "source": "The F1AP Setup procedure is used to establish the F1 interface between a gNB-CU and a gNB-DU. This procedure involves the exchange of F1 Setup Request and F1 Setup Response messages to convey configuration information and establish the necessary F1AP signalling connection.",
+        "location": "slice_1_F1AP_Setup_Procedure.md"
       },
       {
         "kind": "spec",
-        "source": "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-        "location": "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-        "text": "This section details the UE Context Modification procedure initiated by the gNB-CU. It involves the UE CONTEXT MODIFICATION REQUEST message, used to modify the UE Context, particularly concerning radio resources. Understanding this procedure is vital for managing UE-specific configurations and resource allocations."
+        "source": "The UE Context Modification procedure is used to modify the UE context in the gNB-DU, including radio resources and sidelink resources, based on requests from the gNB-CU. This procedure ensures that the gNB-DU's configuration for a specific UE is updated to reflect changes in its radio access bearer setup or other parameters.",
+        "location": "slice_2_UE_Context_Modification_Procedure.md"
       },
       {
         "kind": "spec",
-        "source": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-        "location": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-        "text": "This section provides the message definition for the UE CONTEXT MODIFICATION REQUEST. It specifies the various Information Elements (IEs) contained within the message, such as gNB-CU UE F1AP ID, gNB-DU UE F1AP ID, and C-RNTI. Understanding these IEs is essential for correct message encoding and decoding."
-      },
-      {
-        "kind": "spec",
-        "source": "\u00a78.4.2 DL RRC Message Transfer",
-        "location": "\u00a78.4.2 DL RRC Message Transfer",
-        "text": "This section describes the DL RRC Message Transfer procedure, which is part of UE-associated signalling. It involves mechanisms for UE context lookup and is relevant for F1-connection establishment and scenarios involving UE release. The procedure ensures proper delivery of RRC messages to the UE."
-      },
-      {
-        "kind": "spec",
-        "source": "\u00a79.2.3.2 DL RRC MESSAGE TRANSFER",
-        "location": "\u00a79.2.3.2 DL RRC MESSAGE TRANSFER",
-        "text": "This section defines the DL RRC MESSAGE TRANSFER message. Key Information Elements include gNB-DU UE F1AP ID, old gNB-DU UE F1AP ID, and the RRC-Container. It also addresses scenarios where the UE Context is not retrievable, which is critical for handling error conditions and ensuring robust communication."
-      },
-      {
-        "kind": "spec",
-        "source": "\u00a78.4.2.2 Successful operation, Interactions with UE Context Release Request procedure",
-        "location": "\u00a78.4.2.2 Successful operation, Interactions with UE Context Release Request procedure",
-        "text": "This section details the successful operation of the UE Context Release Request procedure. It covers the UE release process, including the cleanup of the UE-associated logical F1-connection and context cleanup. It also addresses interactions with other procedures and scenarios where the UE Context might not be retrievable, ensuring proper resource deallocation."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_handler.c",
-        "location": "openair2/F1AP/f1ap_handler.c:f1ap_handle_f1ap_setup_response",
-        "text": "The gNB-CU crashes upon receiving an F1AP Setup Response. This function is the primary entry point for handling this message and needs to be investigated for state corruption or unexpected conditions."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_handler.c",
-        "location": "openair2/F1AP/f1ap_handler.c:f1ap_handle_ue_context_modification_request",
-        "text": "The attacker modifies the RNTI in this request. This function processes the request and updates the UE context, making it critical to understand how RNTI changes are handled and validated."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_handler.c",
-        "location": "openair2/F1AP/f1ap_handler.c:f1ap_handle_dl_rrc_message_transfer",
-        "text": "This message is sent after UE release and uses the modified RNTI. The function's logic for looking up or validating the UE context, especially after a release, is crucial, as the spec mentions 'UE Context not retrievable'."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_handler.c",
-        "location": "openair2/F1AP/f1ap_handler.c:f1ap_handle_ue_context_release_request",
-        "text": "The bug occurs after UE release. This function is responsible for cleaning up UE contexts, and any failure to properly invalidate or remove RNTI associations could lead to stale context issues."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_ue_context.c",
-        "location": "openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_get_by_rnti",
-        "text": "The bug involves an 'incorrect RNTI' and 'UE Context not retrievable'. This function is likely used to retrieve UE contexts based on RNTI, and its behavior with incorrect or stale RNTIs is critical."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_ue_context.c",
-        "location": "openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_update_rnti",
-        "text": "To understand how the RNTI is modified during UE Context Modification and how it's invalidated/removed during UE Release, which is key to identifying if stale RNTI references persist."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_decode.c",
-        "location": "openair2/F1AP/f1ap_decode.c:f1ap_decode_ue_context_modification_request",
-        "text": "To verify how the RNTI is extracted from the incoming UE Context Modification Request message and if any validation or bounds checking is performed during decoding."
-      },
-      {
-        "kind": "code",
-        "source": "openair2/F1AP/f1ap_decode.c",
-        "location": "openair2/F1AP/f1ap_decode.c:f1ap_decode_dl_rrc_message_transfer",
-        "text": "To verify how UE F1AP IDs or RNTI are extracted from the incoming DL RRC Message Transfer, especially when a context might have been released, potentially leading to incorrect lookups."
+        "source": "The UE Release procedure is initiated by either the gNB-CU or gNB-DU to release the UE context and associated resources. This procedure ensures that all radio and core network resources allocated to a specific UE are properly deallocated when the UE's connection is terminated.",
+        "location": "slice_3_UE_Release_Procedure.md"
       }
     ]
   },
@@ -245,247 +159,190 @@
         "from": "gNB-CU",
         "to": "gNB-DU",
         "message": "F1AP Setup Request",
-        "precond": "Initial F1AP interface setup initiated.",
-        "postcond": "gNB-CU expects F1AP Setup Response."
+        "precond": "F1AP interface is not established.",
+        "postcond": "gNB-DU receives F1AP Setup Request."
       },
       {
-        "from": "gNB-CU",
+        "from": "gNB-DU",
         "to": "gNB-DU",
-        "message": "UE Context Modification Request",
-        "precond": "UE Context is active and F1AP interface is established. Attacker intercepts and modifies RNTI in the message.",
-        "postcond": "gNB-CU's internal state might be updated with the attacker-modified RNTI, potentially creating an inconsistent mapping."
-      },
-      {
-        "from": "gNB-CU",
-        "to": "gNB-DU",
-        "message": "UE Context Release Request",
-        "precond": "UE Context exists for the UE.",
-        "postcond": "UE Context is marked for release; associated resources and F1-connection are cleaned up."
-      },
-      {
-        "from": "Attacker",
-        "to": "gNB-CU",
-        "message": "DL RRC Message Transfer",
-        "precond": "UE Context for the modified RNTI has been released. Attacker sends message using the now stale/incorrect RNTI.",
-        "postcond": "gNB-CU attempts to look up a non-existent or stale UE context, leading to memory corruption or an invalid pointer dereference, corrupting the gNB-CU's internal state."
+        "message": "Process F1AP Setup Request",
+        "precond": "gNB-DU received F1AP Setup Request.",
+        "postcond": "gNB-DU prepares F1AP Setup Response."
       },
       {
         "from": "gNB-DU",
         "to": "gNB-CU",
         "message": "F1AP Setup Response",
-        "precond": "gNB-CU is in a corrupted state due to previous attacker actions.",
-        "postcond": "gNB-CU crashes upon processing the F1AP Setup Response due to the prior state corruption."
+        "precond": "gNB-DU successfully processed F1AP Setup Request.",
+        "postcond": "gNB-CU receives F1AP Setup Response."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Handle F1AP Setup Response (calls DU_handle_F1_SETUP_RESPONSE)",
+        "precond": "gNB-CU received F1AP Setup Response.",
+        "postcond": "gNB-CU crashes due to incorrect handler dispatch."
       }
     ],
     "state_machine": {
       "states": [
-        "F1AP_Disconnected",
-        "F1AP_Connecting",
-        "F1AP_Connected",
-        "UE_Context_Active",
-        "UE_Context_Modifying",
-        "UE_Context_Releasing",
-        "UE_Context_Released",
-        "Corrupted_State"
+        "F1_DOWN",
+        "F1_SETUP_REQUEST_SENT",
+        "F1_SETUP_RESPONSE_PROCESSING",
+        "F1_UP",
+        "F1_SETUP_FAILED",
+        "CU_CRASHED"
       ],
       "transitions": [
         {
-          "from": "F1AP_Disconnected",
-          "to": "F1AP_Connecting",
-          "on": "F1AP Setup Request"
+          "from": "F1_DOWN",
+          "to": "F1_SETUP_REQUEST_SENT",
+          "on": "F1AP_Setup_Initiated"
         },
         {
-          "from": "F1AP_Connecting",
-          "to": "F1AP_Connected",
-          "on": "F1AP Setup Response (Success)"
+          "from": "F1_SETUP_REQUEST_SENT",
+          "to": "F1_SETUP_RESPONSE_PROCESSING",
+          "on": "F1AP_Setup_Response_Received"
         },
         {
-          "from": "F1AP_Connected",
-          "to": "UE_Context_Active",
-          "on": "UE Context Setup"
+          "from": "F1_SETUP_RESPONSE_PROCESSING",
+          "to": "CU_CRASHED",
+          "on": "Internal_Handler_Dispatch",
+          "guard": "Incorrect_Handler_Called (DU_handle_F1_SETUP_RESPONSE)"
         },
         {
-          "from": "UE_Context_Active",
-          "to": "UE_Context_Modifying",
-          "on": "UE Context Modification Request"
+          "from": "F1_SETUP_RESPONSE_PROCESSING",
+          "to": "F1_UP",
+          "on": "Internal_Handler_Dispatch",
+          "guard": "Correct_Handler_Called (CU_handle_F1_SETUP_RESPONSE) (if bug fixed)"
         },
         {
-          "from": "UE_Context_Modifying",
-          "to": "UE_Context_Active",
-          "on": "UE Context Modification Response (Success)"
+          "from": "F1_SETUP_REQUEST_SENT",
+          "to": "F1_SETUP_FAILED",
+          "on": "F1AP_Setup_Failure_Received"
         },
         {
-          "from": "UE_Context_Active",
-          "to": "UE_Context_Releasing",
-          "on": "UE Context Release Request"
+          "from": "F1_SETUP_REQUEST_SENT",
+          "to": "F1_SETUP_FAILED",
+          "on": "F1AP_Setup_Timer_Expired"
         },
         {
-          "from": "UE_Context_Modifying",
-          "to": "UE_Context_Releasing",
-          "on": "UE Context Release Request"
+          "from": "F1_SETUP_FAILED",
+          "to": "F1_DOWN",
+          "on": "Retry_F1AP_Setup"
         },
         {
-          "from": "UE_Context_Releasing",
-          "to": "UE_Context_Released",
-          "on": "UE Context Release Complete"
-        },
-        {
-          "from": "UE_Context_Released",
-          "to": "Corrupted_State",
-          "on": "DL RRC Message Transfer",
-          "guard": "UE Context lookup fails for incorrect/stale RNTI, leading to memory corruption."
-        },
-        {
-          "from": "Corrupted_State",
-          "to": "F1AP_Disconnected",
-          "on": "F1AP Setup Response",
-          "guard": "gNB-CU crashes due to corrupted state, leading to restart/reset."
+          "from": "F1_UP",
+          "to": "F1_DOWN",
+          "on": "F1AP_Reset_Received_or_Link_Failure"
         }
       ]
     },
     "assumptions": [
-      "The attacker has the capability to intercept and modify F1AP messages (specifically UE Context Modification Request) and inject new F1AP messages (DL RRC Message Transfer).",
-      "The 'incorrect RNTI' used in the DL RRC Message Transfer refers to an RNTI that either points to a released context or an invalid memory location after the UE context has been released.",
-      "The gNB-CU does not properly validate the RNTI or the existence of the UE context when processing DL RRC Message Transfer for a released UE, leading to state corruption.",
-      "The F1AP Setup Response is a legitimate message from the gNB-DU, but the gNB-CU's state is already compromised when it receives it, causing the crash as a symptom of prior corruption.",
-      "The crash in 'f1ap_handle_f1ap_setup_response' is a consequence of accessing a corrupted data structure or invalid memory, rather than an issue within the F1AP Setup Response handling logic itself."
+      "The 'f1ap_messages_processing' table is a shared dispatch table used by both gNB-CU and gNB-DU for incoming F1AP messages.",
+      "The 'pdu->present' value correctly indicates the message direction (initiating, successful outcome, unsuccessful outcome).",
+      "The 'DU_handle_F1_SETUP_RESPONSE' function, when executed in the gNB-CU context, attempts to access gNB-DU specific resources or context, leading to a crash.",
+      "The F1AP Setup procedure is initiated by the gNB-CU, and the gNB-DU responds to it.",
+      "The 'F1AP_SETUP_RESP' ITTI message handled by 'F1AP_CU_task' is an internal message triggering the CU to send an F1AP Setup Response, not to process an incoming one."
     ],
     "questions": [
-      "How exactly is the RNTI modified by the attacker in the UE Context Modification Request? Is it a valid RNTI for another UE, or an arbitrary, invalid value?",
-      "What specific data structure or memory region within the gNB-CU is corrupted when the DL RRC Message Transfer with the incorrect RNTI is processed after UE release?",
-      "What is the exact mechanism by which 'f1ap_handle_f1ap_setup_response' triggers the crash (e.g., null pointer dereference, assertion failure, heap corruption)?",
-      "Does the gNB-CU maintain a global state or a shared resource that could be corrupted by a specific UE context operation and then accessed by the F1AP Setup Response handler?",
-      "Are there any checks for UE context validity or RNTI validity in 'f1ap_handle_dl_rrc_message_transfer' or 'f1ap_ue_context_get_by_rnti' after a UE has been released?"
-    ],
-    "review_request": "HumanInLoop_B_required"
+      "Is there a 'CU_handle_F1_SETUP_RESPONSE' function intended for processing the F1AP Setup Response in the gNB-CU, or should the CU not expect to receive this message?",
+      "How is the 'f1ap_messages_processing' table populated/configured for the gNB-CU vs. gNB-DU? Should there be separate dispatch tables for each component?",
+      "What specific resource or context access within 'DU_handle_F1_SETUP_RESPONSE' causes the gNB-CU to crash?",
+      "What is the expected behavior of the gNB-CU upon successfully receiving and processing an F1AP Setup Response?",
+      "Is the 'key_ids: {\"rnti\": \"incorrect value\"}' from the bug card relevant to the F1AP Setup procedure, or is it a misdirection?"
+    ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "Directionality",
-        "result": "PASS",
-        "evidence": [
-          "sequence_diagram: F1AP Setup Request (gNB-CU to gNB-DU), F1AP Setup Response (gNB-DU to gNB-CU)",
-          "sequence_diagram: UE Context Modification Request (gNB-CU to gNB-DU)",
-          "sequence_diagram: UE Context Release Request (gNB-CU to gNB-DU)",
-          "snippets: \u00a78.3.4 UE Context Modification (gNB-CU initiated) confirms gNB-CU initiates the modification request."
-        ]
-      },
-      {
-        "name": "Req/Resp Pairing",
-        "result": "PASS",
-        "evidence": [
-          "sequence_diagram: F1AP Setup Request is followed by F1AP Setup Response, indicating a pairing.",
-          "The crash occurs during the processing of a valid F1AP Setup Response, not due to a missing response."
-        ]
-      },
-      {
-        "name": "ID Binding (RNTI, F1AP IDs)",
+        "name": "Directionality of F1AP Setup Response handler",
         "result": "FAIL",
         "evidence": [
-          "bug_card.key_ids.rnti: 'incorrect value' is explicitly stated as part of the attack.",
-          "sequence_diagram: 'Attacker intercepts and modifies RNTI in the message' during UE Context Modification Request.",
-          "sequence_diagram: 'Attacker sends message using the now stale/incorrect RNTI' in DL RRC Message Transfer.",
-          "state_machine: Transition to 'Corrupted_State' on 'DL RRC Message Transfer' with guard 'UE Context lookup fails for incorrect/stale RNTI, leading to memory corruption.'",
-          "snippets: \u00a79.2.3.2 DL RRC MESSAGE TRANSFER 'addresses scenarios where the UE Context is not retrievable, which is critical for handling error conditions and ensuring robust communication.' The implementation fails to handle this robustly, leading to corruption.",
-          "snippets: openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_get_by_rnti is the likely point of failure for looking up the stale RNTI."
+          "openair2/F1AP/f1ap_handlers.c:36:1: static const f1ap_message_processing_t f1ap_messages_processing[][3] = { {DU_handle_RESET, CU_handle_RESET_ACKNOWLEDGE, 0}, /* Reset */ {CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}, /* F1Setup */",
+          "openair2/F1AP/f1ap_du_interface_management.c:106:1: int DU_handle_F1_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu) { LOG_D(F1AP, \"DU_handle_F1_SETUP_RESPONSE\\n\");",
+          "openair2/F1AP/f1ap_cu_interface_management.h:26:1: int CU_send_F1_SETUP_RESPONSE(sctp_assoc_t assoc_id, f1ap_setup_resp_t *f1ap_setup_resp);"
         ]
       },
       {
-        "name": "Transaction Scoping (UE Context lifecycle)",
-        "result": "FAIL",
+        "name": "Req/Resp pairing for F1AP Setup",
+        "result": "PASS",
         "evidence": [
-          "sequence_diagram: UE Context Release Request is sent, followed by an attacker sending a DL RRC Message Transfer using a stale RNTI, which leads to corruption that affects a later F1AP Setup Response.",
-          "state_machine: The system transitions from 'UE_Context_Released' to 'Corrupted_State' due to a DL RRC Message Transfer with a stale RNTI, indicating a failure to properly manage the context lifecycle after release.",
-          "snippets: \u00a78.4.2.2 Successful operation, Interactions with UE Context Release Request procedure mentions 'cleanup of the UE-associated logical F1-connection and context cleanup'. The bug suggests this cleanup is incomplete or insufficient to prevent subsequent corruption from stale IDs."
+          "openair2/F1AP/f1ap_handlers.c:36:1: {CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}, /* F1Setup */",
+          "slice_1_F1AP_Setup_Procedure.md: The F1AP Setup procedure is used to establish the F1 interface between a gNB-CU and a gNB-DU. This procedure involves the exchange of F1 Setup Request and F1 Setup Response messages to convey configuration information and establish the necessary F1AP signalling connection."
+        ]
+      },
+      {
+        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
+        "result": "UNKNOWN",
+        "evidence": []
+      },
+      {
+        "name": "Transaction scoping (TransactionID)",
+        "result": "PASS",
+        "evidence": [
+          "openair2/F1AP/lib/f1ap_interface_management.c:647:1: case F1AP_ProtocolIE_ID_id_TransactionID: // Transaction ID (M) _F1_EQ_CHECK_INT(ie->value.present, F1AP_F1SetupResponseIEs__value_PR_TransactionID); AssertError(ie->value.choice.TransactionID != -1, return false, \"ie->value.choice.TransactionID is -1\"); out->transaction_id = ie->value.choice.TransactionID; break;"
         ]
       },
       {
         "name": "No-pending-request on new request",
         "result": "UNKNOWN",
-        "evidence": [
-          "The provided information does not clearly indicate a scenario where the gNB-CU itself sends a new request while a previous one is pending, leading to the crash. The crash is a result of state corruption from an attacker-injected message, not a protocol sequencing error by the gNB-CU in terms of pending requests."
-        ]
+        "evidence": []
       },
       {
         "name": "Timer preconditions",
         "result": "UNKNOWN",
-        "evidence": [
-          "No specific timers or their preconditions are mentioned in the bug card, sequence diagram, state machine, or snippets that are directly relevant to the observed crash."
-        ]
+        "evidence": []
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The gNB-CU crashes due to state corruption caused by an attacker injecting a DL RRC Message Transfer with a stale RNTI after the corresponding UE context has been released. While the specification (\u00a79.2.3.2 DL RRC MESSAGE TRANSFER, \u00a78.4.2.2 Successful operation, Interactions with UE Context Release Request procedure) hints at handling scenarios where the UE Context is 'not retrievable' and emphasizes 'context cleanup', the implementation fails to robustly handle these conditions. Specifically, the system's ID binding and transaction scoping mechanisms appear to be flawed, allowing a stale RNTI to cause memory corruption (as indicated by the state machine's transition to 'Corrupted_State' and the 'UE Context lookup fails' guard). This corruption then manifests as a crash during a subsequent, otherwise valid, F1AP Setup Response. This points to an implementation defect in managing UE context lifecycle and validating RNTIs, rather than a non-conformance with the explicit protocol sequence."
+    "rationale": "The `f1ap_messages_processing` table in `openair2/F1AP/f1ap_handlers.c` is responsible for dispatching incoming F1AP messages to the correct handler function based on the procedure code and message direction. For the `F1Setup` procedure, the table entry is `{CU_handle_F1_SETUP_REQUEST, DU_handle_F1_SETUP_RESPONSE, DU_handle_F1_SETUP_FAILURE}`. The `F1AP Setup Response` is a 'Successful outcome' message, which corresponds to the second element in this array. Therefore, when the gNB-CU receives an `F1AP Setup Response`, the `f1ap_handle_message` function incorrectly dispatches it to `DU_handle_F1_SETUP_RESPONSE`. This function, as seen in `openair2/F1AP/f1ap_du_interface_management.c`, contains logic specific to the gNB-DU. Executing DU-specific logic within the gNB-CU context upon receiving an F1AP Setup Response leads to a crash, as described in the observed behavior. The gNB-CU should instead have its own handler (e.g., `CU_handle_F1_SETUP_RESPONSE`, which is declared in `f1ap_cu_interface_management.h` but not correctly mapped for incoming messages) to process the F1AP Setup Response."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "slice_1_F1AP_Setup.md",
-        "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-        "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-        "\u00a78.4.2 DL RRC Message Transfer",
-        "\u00a79.2.3.2 DL RRC MESSAGE TRANSFER",
-        "\u00a78.4.2.2 Successful operation, Interactions with UE Context Release Request procedure"
+        "slice_1_F1AP_Setup_Procedure.md"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_handler.c:f1ap_handle_f1ap_setup_response",
-        "openair2/F1AP/f1ap_handler.c:f1ap_handle_ue_context_modification_request",
-        "openair2/F1AP/f1ap_handler.c:f1ap_handle_dl_rrc_message_transfer",
-        "openair2/F1AP/f1ap_handler.c:f1ap_handle_ue_context_release_request",
-        "openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_get_by_rnti",
-        "openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_update_rnti",
-        "openair2/F1AP/f1ap_decode.c:f1ap_decode_ue_context_modification_request",
-        "openair2/F1AP/f1ap_decode.c:f1ap_decode_dl_rrc_message_transfer"
+        "openair2/F1AP/f1ap_handlers.c:36:1",
+        "openair2/F1AP/f1ap_du_interface_management.c:106:1",
+        "openair2/F1AP/f1ap_cu_interface_management.h:26:1",
+        "openair2/F1AP/f1ap_cu_task.c:30:1",
+        "openair2/F1AP/lib/f1ap_interface_management.c:647:1"
       ],
-      "expected_vs_observed": "The expected behavior is that the gNB-CU should robustly handle scenarios where a DL RRC Message Transfer is received with a stale or incorrect RNTI, especially after the associated UE context has been released. The specification implies graceful handling of 'UE Context not retrievable' conditions and mandates proper context cleanup during UE release, preventing subsequent state corruption. However, the observed behavior is that an attacker's modification of an RNTI in a UE Context Modification request, followed by sending a DL RRC Message Transfer with that stale RNTI after UE release, leads to memory corruption. This corruption ultimately causes the gNB-CU to crash when processing a seemingly unrelated F1AP Setup Response, indicating a critical failure in maintaining ID binding and transaction scoping across the UE context lifecycle."
+      "expected_vs_observed": "The F1AP specification and the `f1ap_messages_processing` table in `f1ap_handlers.c` indicate that the F1AP Setup procedure is initiated by the gNB-CU with an F1AP Setup Request, and the gNB-DU responds with an F1AP Setup Response. Consequently, the gNB-DU is expected to handle the reception of an F1AP Setup Response, as confirmed by `DU_handle_F1_SETUP_RESPONSE` in `f1ap_du_interface_management.c`. The `F1AP_CU_task` in `f1ap_cu_task.c` also shows the CU's role is to *send* the F1AP Setup Response. However, the observed behavior is that the gNB-CU crashes when it *receives* an F1AP Setup Response, which is contrary to the defined message flow and handler assignments."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-CU crashes due to memory corruption caused by an attacker exploiting a weakness in ID binding and transaction scoping. After a UE context is released, the gNB-CU fails to robustly handle a DL RRC Message Transfer containing a stale RNTI (modified by an attacker during a prior UE Context Modification). This leads to memory corruption, which manifests as a crash during a subsequent, seemingly unrelated F1AP Setup Response. The implementation does not adequately clean up or invalidate RNTI mappings post-release, nor does it gracefully handle lookups for non-existent or stale RNTIs, contrary to the implied robustness in the specification for handling 'UE Context not retrievable' scenarios.",
+      "rationale": "The gNB-CU is crashing upon receiving an F1AP Setup Response. According to the F1AP specification and the `f1ap_messages_processing` table, the F1AP Setup procedure is initiated by the gNB-CU (sending F1AP Setup Request) and responded to by the gNB-DU (sending F1AP Setup Response). Therefore, the gNB-CU should not be receiving an F1AP Setup Response. The `DU_handle_F1_SETUP_RESPONSE` function is correctly assigned to the DU, indicating the DU is expected to handle this message. The CU's crash on receiving this message suggests an incorrect message routing or handling logic within the CU, where it's attempting to process a message intended for the DU or a message it should not be receiving in this context.",
       "citations": {
         "spec": [
-          "slice_1_F1AP_Setup.md",
-          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
-          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-          "\u00a78.4.2 DL RRC Message Transfer",
-          "\u00a79.2.3.2 DL RRC MESSAGE TRANSFER",
-          "\u00a78.4.2.2 Successful operation, Interactions with UE Context Release Request procedure"
+          "slice_1_F1AP_Setup_Procedure.md"
         ],
         "code": [
-          "openair2/F1AP/f1ap_handler.c:f1ap_handle_f1ap_setup_response",
-          "openair2/F1AP/f1ap_handler.c:f1ap_handle_ue_context_modification_request",
-          "openair2/F1AP/f1ap_handler.c:f1ap_handle_dl_rrc_message_transfer",
-          "openair2/F1AP/f1ap_handler.c:f1ap_handle_ue_context_release_request",
-          "openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_get_by_rnti",
-          "openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_update_rnti",
-          "openair2/F1AP/f1ap_decode.c:f1ap_decode_ue_context_modification_request",
-          "openair2/F1AP/f1ap_decode.c:f1ap_decode_dl_rrc_message_transfer"
+          "openair2/F1AP/f1ap_handlers.c:36:1",
+          "openair2/F1AP/f1ap_du_interface_management.c:106:1",
+          "openair2/F1AP/f1ap_cu_interface_management.h:26:1",
+          "openair2/F1AP/f1ap_cu_task.c:30:1"
         ]
       },
       "suggested_repro": [
-        "Initiate a UE Context Modification procedure.",
-        "Intercept and modify the RNTI in the UE Context Modification request message.",
-        "Complete the UE Context Modification.",
-        "Initiate and complete a UE Context Release procedure for the UE.",
-        "After UE release, send a DL RRC Message Transfer using the previously modified (now stale) RNTI.",
-        "Observe memory corruption.",
-        "Initiate an F1AP Setup procedure.",
-        "Observe gNB-CU crash upon receiving the F1AP Setup Response."
+        "Initiate an F1AP Setup procedure where the gNB-CU sends an F1AP Setup Request to the gNB-DU.",
+        "Configure the gNB-DU to send an F1AP Setup Response back to the gNB-CU.",
+        "Observe the gNB-CU crashing upon reception of the F1AP Setup Response."
       ],
       "risks": [
-        "Security Vulnerability: Attacker-induced crashes leading to Denial of Service (DoS) for the gNB-CU.",
-        "System Instability: Memory corruption can lead to unpredictable behavior beyond just crashes, potentially affecting other UEs or network functions.",
-        "Data Integrity: Potential for data corruption if memory is overwritten incorrectly.",
-        "Compliance: Failure to meet robustness requirements implied by the specification for handling error conditions and context lifecycle."
+        "Service Interruption: The gNB-CU crashing prevents the establishment of the F1 interface, leading to a complete inability to connect DUs and serve UEs.",
+        "Deployment Failure: New gNB-DU deployments or reconfigurations requiring F1AP Setup will fail.",
+        "Resource Wastage: Repeated crashes and restarts of the gNB-CU consume system resources and operational effort."
       ],
       "next_steps": [
-        "Investigate openair2/F1AP/f1ap_ue_context.c:f1ap_ue_context_get_by_rnti and f1ap_ue_context_update_rnti for proper RNTI invalidation and cleanup upon UE context release.",
-        "Implement robust error handling for DL RRC Message Transfer when the RNTI lookup fails (e.g., for stale RNTIs), preventing memory corruption.",
-        "Ensure that UE context cleanup during release procedures (f1ap_handle_ue_context_release_request) fully invalidates or removes associated RNTI mappings.",
-        "Add unit tests specifically for handling stale RNTIs and post-release message reception."
+        "Investigate the F1AP message routing and handling logic within the gNB-CU to determine why it is receiving and attempting to process an F1AP Setup Response.",
+        "Verify the `f1ap_messages_processing` table and associated handler assignments for the gNB-CU to ensure correct message dispatch.",
+        "Implement a check in the gNB-CU to gracefully handle unexpected F1AP messages, logging an error instead of crashing.",
+        "Review the F1AP Setup procedure implementation in both gNB-CU and gNB-DU to ensure strict adherence to the F1AP specification regarding message directionality."
       ]
     }
   }
