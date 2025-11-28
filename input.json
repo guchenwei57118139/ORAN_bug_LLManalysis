@@ -34,5 +34,21 @@
     "bug9":{
         "input":"Bug: gNB-DU crashes when receiving DLRRCMessage Transfer after releasing UE.\nRepro Steps:\n1) The attacker intercepts a legitimate UE Context Modification request.\n2) Modify the RNTI in the IE to an incorrect value and forward it to the gNB-CU.\n3) For gNB-DUs, the attacker waits for UE release and immediately sends a DLRRCMessage Transfer.",
         "output":"./report/report9.json"
+    },
+    "bug10":{
+        "input":"Bug: gNB-CU crashes when RESET message contains UE IDs mapping to different contexts.\nRepro Steps:\nEstablish two UE contexts: Context-A with CU-ID=100/DU-ID=200, Context-B with CU-ID=101/DU-ID=201.\nSend RESET message with Item containing CU-ID=100 and DU-ID=201 (inconsistent pair - CU-ID→Context-A, DU-ID→Context-B).\nOAI gNB-CU crashes attempting to process the inconsistent ID pair.",
+        "output":"./report/report10.json"
+    },
+    "bug11":{
+        "input":"Bug: NAS messages silently discarded for unknown UE contexts without AMF notification.\nRepro Steps:\nEstablish and release UE context (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200).\nAMF sends DOWNLINK NAS TRANSPORT for the released context with AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200.\nOAI NG-RAN logs the error locally but does not send NAS NON DELIVERY INDICATION to AMF.",
+        "output":"./report/report11.json"
+    },
+    "bug12":{
+        "input":"Bug: Release commands for non-existent PDU Sessions accepted without error indication.\nRepro Steps:\nEstablish UE context without any active PDU sessions.\nAMF sends PDU SESSION RESOURCE RELEASE COMMAND with non-existent PDU-Session-ID=99.\nOAI NG-RAN logs warning but returns PDU SESSION RESOURCE RELEASE RESPONSE without indicating the session was unknown.",
+        "output":"./report/report12.json"
+    },
+    "bug13":{
+        "input":"Bug: NAS messages with mismatched UE identities accepted without validation, enabling potential security bypass.\nRepro Steps:\nEstablish UE context with AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200, and UE identity in NAS layer as SUPI-A.\nSend UPLINK NAS TRANSPORT message with AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200, but NAS-PDU containing different UE identity SUPI-B.\nOAI NG-RAN accepts the message",
+        "output":"./report/report13.json"
     }
 }
