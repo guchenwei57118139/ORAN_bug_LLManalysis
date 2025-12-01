@@ -87,7 +87,7 @@
           }
         }
       },
-      "llm_prompt_template": "You are SpecIndexer. You will receive a spec table of contents/headings via the API in SPEC_TOC and MUST read it as ground truth.\nFile: \n{{name}} ({{mime_type}})\nFrom BUG_CARD and SPEC_TOC, pick 3–6 most relevant sections (procedures, timers, message definitions) by listing some keywords. Also, list the related headings to the TITlE. Return JSON per output_schema.",
+      "llm_prompt_template": "You are SpecIndexer. You will receive a spec table of contents/headings via the API in SPEC_TOC and MUST read it as ground truth.\nFile: \n{{name}} ({{mime_type}})\nFrom BUG_CARD and SPEC_TOC, pick 3–6 most relevant sections (procedures, timers, message definitions) by listing some keywords. Also, list the related headings to the TITlE. Return JSON per output_schema. Note, all the contents in the output_schema should be the content from the uploaded specs",
       "output_schema": {
         "type": "object",
         "required": ["candidate_spec_sections","expected_behaviour"],
@@ -128,7 +128,7 @@
           "iteration": { "type": "integer", "minimum": 0, "default": 0 },
           "max_iters": { "type": "integer", "minimum": 1, "default": 3 }
       },
-      "llm_prompt_template": "You are CodeLocator. Build a prioritized list of files/functions to fetch according to the code tree file. Use interface names, procedure/timer, keywords. Plan recursion if initial fetch seems insufficient, and propose additional fetch_requests. Return JSON per output_schema.",
+      "llm_prompt_template": "You are CodeLocator. Build a prioritized list of files/functions to fetch according to the code tree file. Use interface names, procedure/timer, keywords. Plan recursion if initial fetch seems insufficient, and propose additional fetch_requests. Return JSON per output_schema. Note, all the contents in the output_schema should be the content from the uploaded codes",
       "output_schema": {
         "type": "object",
         "required": ["candidate_code","control"],
@@ -175,7 +175,7 @@
           "candidate_code": { "$ref": "#/steps/2/output_schema/properties/candidate_code" }
         }
       },
-      "llm_prompt_template": "You are SnippetRetriever. For each query, return top snippets with exact locations (spec id/anchor, file:line-range). Keep each snippet ≤ 120 words. Return JSON per output_schema.",
+      "llm_prompt_template": "You are SnippetRetriever. For each query, return top snippets with exact locations (spec id/anchor, file:line-range). Keep each snippet ≤ 120 words. Return JSON per output_schema. Note, all the contents in the output_schema should be the content from the uploaded specs or codes",
       "output_schema": {
         "type": "object",
         "required": ["snippets"],
@@ -246,7 +246,7 @@
           "snippets": { "$ref": "#/steps/3/output_schema/properties/snippets" }
         }
       },
-      "llm_prompt_template": "You are ConformanceChecker. Using SNIPPETS as authority, test invariants: directionality, req/resp pairing, ID binding (e.g., CU/DU UE F1AP ID), transaction scoping, no-pending-request on new request, timer preconditions. For each invariant: PASS/FAIL with cite. Propose preliminary verdict per output_schema.",
+      "llm_prompt_template": "You are ConformanceChecker. Using SNIPPETS as authority, test invariants: directionality, req/resp pairing, ID binding (e.g., CU/DU UE F1AP ID), transaction scoping, no-pending-request on new request, timer preconditions. For each invariant: PASS/FAIL with cite. Propose preliminary verdict per output_schema. Note, all the contents in the output_schema should comply with the uploaded specs or codes ",
       "output_schema": {
         "type": "object",
         "required": ["invariant_checks", "preliminary_verdict", "rationale"],
@@ -273,7 +273,7 @@
           "snippets": { "$ref": "#/steps/3/output_schema/properties/snippets" }
         }
       },
-      "llm_prompt_template": "You are EvidenceBundler. Assemble a minimal yet complete pack: spec refs (id/anchor), code refs (file:lines), and a single paragraph contrasting expected vs observed. Return JSON per output_schema.",
+      "llm_prompt_template": "You are EvidenceBundler. Assemble a minimal yet complete pack: spec refs (id/anchor), code refs (file:lines), and a single paragraph contrasting expected vs observed. Return JSON per output_schema. Note, all the contents in the output_schema should comply with the uploaded specs or codes",
       "output_schema": {
         "type": "object",
         "required": ["evidence_pack"],
@@ -303,7 +303,7 @@
           "evidence_pack": { "$ref": "#/steps/6/output_schema/properties/evidence_pack" }
         }
       },
-      "llm_prompt_template": "You are ReportWriter. Produce the final JSON report with {verdict, rationale, citations, suggested_repro, risks, next_steps}. Be concise and actionable.",
+      "llm_prompt_template": "You are ReportWriter. Produce the final JSON report with {verdict, rationale, citations, suggested_repro, risks, next_steps}. Be concise and actionable. Note, all the contents in the output_schema should comply with the uploaded specs or codes",
       "output_schema": {
         "type": "object",
         "required": ["report"],
