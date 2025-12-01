@@ -1,7 +1,7 @@
 {
   "step1": {
     "bug_card": {
-      "observed_behavior": "gNB-DU bypasses F1AP Setup procedure when receiving UEContextModificationRequest, and starts GTP-U instance directly.",
+      "observed_behavior": "The gNB-DU bypasses the F1AP Setup procedure when receiving a UEContextModificationRequest and directly initiates a GTP-U instance. This behavior is triggered by a sequence of attacker-initiated messages, including an incorrect UE Context Setup Request, a UE Context Setup Success, an initialRRCTransfer with mutated DU ID and Transaction ID, and an RRC Setup Success message.",
       "interface_guess": [
         "F1AP",
         "GTP-U",
@@ -11,6 +11,7 @@
         "F1AP Setup procedure",
         "UE Context Modification Request",
         "UE Context Setup Request",
+        "UE Context Setup Success",
         "initialRRCTransfer",
         "RRC Setup Success"
       ],
@@ -20,16 +21,9 @@
         "UE"
       ],
       "key_ids": {
-        "transaction_id": "Transaction ID",
+        "transaction_id": "mutated Transaction ID",
         "du_id": "mutated DU ID"
-      },
-      "signals_or_timers": [
-        "UE Context Setup Request",
-        "UE Context Setup Success",
-        "initialRRCTransfer",
-        "RRC Setup Success",
-        "UEContextModificationRequest"
-      ]
+      }
     }
   },
   "step2": {
@@ -37,13 +31,11 @@
       {
         "Keywords": [
           "F1AP",
-          "setup",
+          "Setup",
           "procedure",
+          "bypass",
           "gNB-DU",
-          "gNB-CU",
-          "UE context",
-          "GTP-U",
-          "bypass"
+          "gNB-CU"
         ],
         "title": [
           "slice_1_F1AP_Setup_procedure.md"
@@ -51,96 +43,171 @@
       },
       {
         "Keywords": [
-          "UE context",
-          "modification",
-          "request",
+          "UE Context Modification Request",
           "gNB-CU",
           "gNB-DU",
           "F1AP",
-          "DRB",
-          "UL UP TNL Information",
           "GTP-U",
+          "UP TNL Information",
+          "DRB",
           "RLC",
           "PDCP",
-          "QoS"
+          "bypass"
         ],
         "title": [
-          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST"
+          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
+          "\u00a79.3.2.1 UP Transport Layer Information",
+          "\u00a79.3.2.2 GTP-TEID",
+          "\u00a78.3.4.2 Successful Operation"
         ]
       },
       {
         "Keywords": [
-          "UE context",
-          "setup",
-          "request",
+          "UE Context Setup Request",
           "gNB-CU",
           "gNB-DU",
-          "F1AP",
-          "DRB",
-          "UL UP TNL Information",
+          "F1AP ID",
           "GTP-U",
-          "RLC",
-          "PDCP",
-          "QoS"
+          "UP TNL Information",
+          "DRB",
+          "SRB",
+          "RRC",
+          "incorrect",
+          "mutated DU ID",
+          "mutated Transaction ID"
         ],
         "title": [
-          "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST"
+          "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST",
+          "\u00a79.3.1.4 gNB-CU UE F1AP ID",
+          "\u00a79.3.1.5 gNB-DU UE F1AP ID",
+          "\u00a79.3.2.1 UP Transport Layer Information",
+          "\u00a79.3.2.2 GTP-TEID",
+          "\u00a78.3.1.2 Successful Operation",
+          "\u00a78.3.1.3 Unsuccessful Operation",
+          "\u00a78.3.1.4 Abnormal Conditions"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Setup Success",
+          "attacker",
+          "sequence"
+        ],
+        "title": [
+          "slice_4_UE_Context_Setup_Success.md"
+        ]
+      },
+      {
+        "Keywords": [
+          "initialRRCTransfer",
+          "mutated DU ID",
+          "mutated Transaction ID",
+          "RRC",
+          "F1AP"
+        ],
+        "title": [
+          "slice_5_initialRRCTransfer.md"
+        ]
+      },
+      {
+        "Keywords": [
+          "RRC Setup Success",
+          "attacker",
+          "sequence"
+        ],
+        "title": [
+          "slice_6_RRC_Setup_Success.md"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-DU should not bypass the F1AP Setup procedure when receiving a UE Context Modification Request, particularly when user plane resources (GTP-U instances) are involved. It must adhere to the specified F1AP procedures for establishing or modifying UE contexts and associated user plane tunnels."
+    "expected_behaviour": "The gNB-DU should not bypass the F1AP Setup procedure and should not directly initiate a GTP-U instance when receiving a UEContextModificationRequest. Instead, the gNB-DU should follow the F1AP Setup procedure as specified, and properly handle any incorrect or mutated messages in the UE context setup sequence, such as an incorrect UE Context Setup Request or an initialRRCTransfer with mutated DU ID and Transaction ID."
   },
   "step3": {
     "candidate_code": [
       {
-        "path": "openair2/F1AP/f1ap_du_task.c",
-        "function_name": "F1AP_DU_task",
-        "reason": "The main task for gNB-DU F1AP, likely contains the logic for handling incoming messages and initiating GTP-U instances, which is the core of the bug."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_du_task.c",
-        "function_name": "du_create_gtpu_instance_to_cu",
-        "reason": "Directly related to the 'starts GTP-U instance directly' part of the bug, this function creates the GTP-U tunnel."
-      },
-      {
         "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
         "function_name": "DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
-        "reason": "This function is the entry point for the gNB-DU when it receives a UE Context Modification Request, which is the trigger for the reported bypass behavior."
+        "reason": "The bug states that the gNB-DU bypasses F1AP Setup when receiving a UEContextModificationRequest, making this the primary trigger point for investigation."
       },
       {
         "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
         "function_name": "DU_handle_UE_CONTEXT_SETUP_REQUEST",
-        "reason": "The bug mentions bypassing F1AP Setup procedure, so understanding how UE Context Setup is handled is crucial for comparison."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_handlers.c",
-        "function_name": "f1ap_handle_message",
-        "reason": "This is the central dispatcher for all F1AP messages, including UE Context Modification Request, directing them to specific handlers."
-      },
-      {
-        "path": "openair3/ocp-gtpu/gtp_itf.cpp",
-        "function_name": "gtpv1Init",
-        "reason": "Core GTP-U initialization function, called when a GTP-U instance is created. Relevant to 'starts GTP-U instance directly'."
+        "reason": "The attacker sequence includes an 'incorrect UE Context Setup Request', suggesting this handler might be involved in establishing a vulnerable state."
       },
       {
         "path": "openair3/ocp-gtpu/gtp_itf.cpp",
         "function_name": "newGtpuCreateTunnel",
-        "reason": "Function responsible for creating new GTP-U tunnels, directly related to the 'starts GTP-U instance directly' part of the bug."
+        "reason": "The bug explicitly mentions 'directly initiates a GTP-U instance'. This function is responsible for creating GTP-U tunnels and is a critical point to investigate the abnormal initiation."
       },
       {
-        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
-        "function_name": "CU_send_UE_CONTEXT_MODIFICATION_REQUEST",
-        "reason": "The CU-side function that initiates the UE Context Modification Request, providing context for the DU's behavior."
+        "path": "openair3/ocp-gtpu/gtp_itf.cpp",
+        "function_name": "gtpv1uTask",
+        "reason": "This is the main task for GTP-U, handling all incoming and outgoing GTP-U messages, including tunnel creation and data transfer, which is central to the observed behavior."
+      },
+      {
+        "path": "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c",
+        "function_name": "deliver_pdu_drb_gnb",
+        "reason": "This function serves as the interface between the PDCP layer and GTP-U for the gNB. If a GTP-U instance is directly initiated, this data path is likely involved."
+      },
+      {
+        "path": "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c",
+        "function_name": "add_drb",
+        "reason": "Data Radio Bearers (DRBs) are associated with GTP-U tunnels. This function, called during UE context setup/modification, is relevant to how tunnels are configured."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_task.c",
+        "function_name": "F1AP_DU_task",
+        "reason": "This is the main task for the gNB-DU F1AP, processing all F1AP messages on the DU side, including the UEContextModificationRequest and potentially triggering GTP-U setup."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_task.c",
+        "function_name": "du_create_gtpu_instance_to_cu",
+        "reason": "This function explicitly creates a GTP-U instance for the DU, which is part of the abnormal behavior described in the bug."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_task.c",
+        "function_name": "F1AP_CU_task",
+        "reason": "This is the main task for the gNB-CU F1AP, processing all F1AP messages on the CU side. Its interaction (or lack thereof) during the bypass is important."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_task.c",
+        "function_name": "cu_task_create_gtpu_instance",
+        "reason": "This function explicitly creates a GTP-U instance for the CU, which is part of the abnormal behavior described in the bug."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "This is the central dispatcher for all F1AP messages. Understanding how messages are routed (or misrouted) is crucial for identifying the bypass."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "du_get_f1_ue_data",
+        "reason": "The bug mentions 'mutated DU ID' and 'mutated Transaction ID'. This function is involved in retrieving DU-side UE F1AP IDs, which might be incorrectly handled or validated."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "F1AP_get_next_transaction_identifier",
+        "reason": "The bug mentions 'mutated Transaction ID'. This function is related to transaction ID generation, which might be exploited or incorrectly used."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
+        "function_name": "DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "reason": "The 'initialRRCTransfer with mutated DU ID and Transaction ID' is part of the attacker sequence, making this function a key point of interest."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
+        "function_name": "CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "reason": "This is the CU's handler for the initial UL RRC message, which is part of the attacker sequence and might reveal how mutated IDs are processed."
       },
       {
         "path": "openair2/F1AP/f1ap_du_interface_management.c",
         "function_name": "DU_send_F1_SETUP_REQUEST",
-        "reason": "The DU-side function that initiates the F1AP Setup procedure. The bug states this procedure is bypassed."
+        "reason": "The bug states 'gNB-DU bypasses the F1AP Setup procedure'. Understanding the normal flow of this function is essential to identify where the bypass occurs."
       },
       {
         "path": "openair2/F1AP/f1ap_cu_interface_management.c",
         "function_name": "CU_handle_F1_SETUP_REQUEST",
-        "reason": "The CU-side handler for F1AP Setup Request, providing context for the expected F1AP Setup flow."
+        "reason": "This is the CU's handler for the F1AP Setup Request. Its behavior (or lack of invocation) is key to understanding the 'F1AP Setup bypass'."
       }
     ],
     "control": {
@@ -149,38 +216,34 @@
         {
           "pattern": "openair2/F1AP/**/*.c",
           "suffix": [
-            ".c"
-          ]
-        },
-        {
-          "pattern": "openair2/F1AP/**/*.h",
-          "suffix": [
+            ".c",
             ".h"
-          ]
+          ],
+          "max_files": 20
         },
         {
           "pattern": "openair3/ocp-gtpu/**/*.cpp",
           "suffix": [
-            ".cpp"
-          ]
+            ".cpp",
+            ".h"
+          ],
+          "max_files": 10
         },
         {
-          "pattern": "openair3/ocp-gtpu/**/*.h",
+          "pattern": "openair2/LAYER2/nr_pdcp/**/*.c",
           "suffix": [
+            ".c",
             ".h"
-          ]
+          ],
+          "max_files": 10
         },
         {
           "pattern": "openair2/RRC/NR/**/*.c",
           "suffix": [
-            ".c"
-          ]
-        },
-        {
-          "pattern": "openair2/RRC/NR/**/*.h",
-          "suffix": [
+            ".c",
             ".h"
-          ]
+          ],
+          "max_files": 10
         }
       ]
     }
@@ -194,263 +257,376 @@
       },
       {
         "kind": "spec",
-        "source": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-        "location": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST"
+        "source": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST \u00a79.3.2.1 UP Transport Layer Information \u00a79.3.2.2 GTP-TEID \u00a78.3.4.2 Successful Operation",
+        "location": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST \u00a79.3.2.1 UP Transport Layer Information \u00a79.3.2.2 GTP-TEID \u00a78.3.4.2 Successful Operation"
       },
       {
         "kind": "spec",
-        "source": "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST",
-        "location": "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST"
+        "source": "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST \u00a79.3.1.4 gNB-CU UE F1AP ID \u00a79.3.1.5 gNB-DU UE F1AP ID \u00a79.3.2.1 UP Transport Layer Information \u00a79.3.2.2 GTP-TEID \u00a78.3.1.2 Successful Operation \u00a78.3.1.3 Unsuccessful Operation \u00a78.3.1.4 Abnormal Conditions",
+        "location": "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST \u00a79.3.1.4 gNB-CU UE F1AP ID \u00a79.3.1.5 gNB-DU UE F1AP ID \u00a79.3.2.1 UP Transport Layer Information \u00a79.3.2.2 GTP-TEID \u00a78.3.1.2 Successful Operation \u00a78.3.1.3 Unsuccessful Operation \u00a78.3.1.4 Abnormal Conditions"
       },
       {
-        "kind": "code",
-        "source": "F1AP_DU_task",
-        "location": "openair2/F1AP/f1ap_du_task.c"
+        "kind": "spec",
+        "source": "slice_4_UE_Context_Setup_Success.md",
+        "location": "slice_4_UE_Context_Setup_Success.md"
       },
       {
-        "kind": "code",
-        "source": "du_create_gtpu_instance_to_cu",
-        "location": "openair2/F1AP/f1ap_du_task.c"
+        "kind": "spec",
+        "source": "slice_5_initialRRCTransfer.md",
+        "location": "slice_5_initialRRCTransfer.md"
+      },
+      {
+        "kind": "spec",
+        "source": "slice_6_RRC_Setup_Success.md",
+        "location": "slice_6_RRC_Setup_Success.md"
       },
       {
         "kind": "code",
         "source": "DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
-        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST"
       },
       {
         "kind": "code",
         "source": "DU_handle_UE_CONTEXT_SETUP_REQUEST",
-        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
-      },
-      {
-        "kind": "code",
-        "source": "f1ap_handle_message",
-        "location": "openair2/F1AP/f1ap_handlers.c"
-      },
-      {
-        "kind": "code",
-        "source": "gtpv1Init",
-        "location": "openair3/ocp-gtpu/gtp_itf.cpp"
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST"
       },
       {
         "kind": "code",
         "source": "newGtpuCreateTunnel",
-        "location": "openair3/ocp-gtpu/gtp_itf.cpp"
+        "location": "openair3/ocp-gtpu/gtp_itf.cpp:newGtpuCreateTunnel"
       },
       {
         "kind": "code",
-        "source": "CU_send_UE_CONTEXT_MODIFICATION_REQUEST",
-        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c"
+        "source": "gtpv1uTask",
+        "location": "openair3/ocp-gtpu/gtp_itf.cpp:gtpv1uTask"
+      },
+      {
+        "kind": "code",
+        "source": "deliver_pdu_drb_gnb",
+        "location": "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c:deliver_pdu_drb_gnb"
+      },
+      {
+        "kind": "code",
+        "source": "add_drb",
+        "location": "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c:add_drb"
+      },
+      {
+        "kind": "code",
+        "source": "F1AP_DU_task",
+        "location": "openair2/F1AP/f1ap_du_task.c:F1AP_DU_task"
+      },
+      {
+        "kind": "code",
+        "source": "du_create_gtpu_instance_to_cu",
+        "location": "openair2/F1AP/f1ap_du_task.c:du_create_gtpu_instance_to_cu"
+      },
+      {
+        "kind": "code",
+        "source": "F1AP_CU_task",
+        "location": "openair2/F1AP/f1ap_cu_task.c:F1AP_CU_task"
+      },
+      {
+        "kind": "code",
+        "source": "cu_task_create_gtpu_instance",
+        "location": "openair2/F1AP/f1ap_cu_task.c:cu_task_create_gtpu_instance"
+      },
+      {
+        "kind": "code",
+        "source": "f1ap_handle_message",
+        "location": "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message"
+      },
+      {
+        "kind": "code",
+        "source": "du_get_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data"
+      },
+      {
+        "kind": "code",
+        "source": "F1AP_get_next_transaction_identifier",
+        "location": "openair2/F1AP/f1ap_ids.c:F1AP_get_next_transaction_identifier"
+      },
+      {
+        "kind": "code",
+        "source": "DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER"
+      },
+      {
+        "kind": "code",
+        "source": "CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER"
       },
       {
         "kind": "code",
         "source": "DU_send_F1_SETUP_REQUEST",
-        "location": "openair2/F1AP/f1ap_du_interface_management.c"
+        "location": "openair2/F1AP/f1ap_du_interface_management.c:DU_send_F1_SETUP_REQUEST"
       },
       {
         "kind": "code",
         "source": "CU_handle_F1_SETUP_REQUEST",
-        "location": "openair2/F1AP/f1ap_cu_interface_management.c"
+        "location": "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST"
       }
     ]
   },
   "step5": {
     "sequence_diagram": [
       {
-        "from": "gNB-DU",
+        "from": "Attacker",
         "to": "gNB-CU",
-        "message": "F1_SETUP_REQUEST",
-        "precond": "F1AP interface not established",
-        "postcond": "F1AP setup initiated"
+        "message": "UE Context Setup Request (incorrect)",
+        "precond": "Attacker aims to establish a false UE context on gNB-CU."
       },
       {
-        "from": "gNB-CU",
+        "from": "Attacker (spoofing gNB-DU)",
+        "to": "gNB-CU",
+        "message": "UE Context Setup Success",
+        "precond": "gNB-CU has processed the (incorrect) UE Context Setup Request."
+      },
+      {
+        "from": "Attacker (spoofing gNB-CU)",
         "to": "gNB-DU",
-        "message": "F1_SETUP_RESPONSE",
-        "precond": "F1AP setup initiated",
-        "postcond": "F1AP interface established"
+        "message": "initialRRCTransfer (mutated DU ID, Transaction ID)",
+        "precond": "Attacker aims to trigger RRC setup on gNB-DU with invalid IDs."
+      },
+      {
+        "from": "Attacker (spoofing UE)",
+        "to": "gNB-DU",
+        "message": "RRC Setup Success",
+        "precond": "gNB-DU has received initialRRCTransfer."
       },
       {
         "from": "gNB-CU",
         "to": "gNB-DU",
         "message": "UEContextModificationRequest",
-        "precond": "F1AP interface established AND UE context exists",
-        "postcond": "gNB-DU receives request"
+        "precond": "gNB-CU believes a UE context is established (due to spoofed messages)."
       },
       {
         "from": "gNB-DU",
-        "to": "gNB-DU (internal)",
-        "message": "Create/Modify GTP-U instance",
-        "precond": "UEContextModificationRequest received AND F1AP interface established",
-        "postcond": "GTP-U instance created/modified"
-      },
-      {
-        "from": "gNB-DU",
-        "to": "gNB-CU",
-        "message": "UEContextModificationResponse",
-        "precond": "GTP-U instance created/modified",
-        "postcond": "gNB-CU acknowledges modification"
+        "to": "GTP-U Module",
+        "message": "Initiate GTP-U Tunnel Creation",
+        "precond": "gNB-DU received UEContextModificationRequest and its internal state (influenced by mutated IDs and spoofed messages) leads it to bypass F1AP Setup.",
+        "postcond": "GTP-U tunnel is created without prior F1AP Setup completion."
       }
     ],
     "state_machine": {
       "states": [
-        "F1AP_DOWN",
-        "F1AP_SETUP_SENT",
-        "F1AP_UP_IDLE",
-        "UE_CONTEXT_SETUP_IN_PROGRESS",
-        "UE_CONTEXT_ACTIVE",
-        "UE_CONTEXT_MODIFICATION_IN_PROGRESS"
+        "Idle",
+        "F1AP_Not_Established",
+        "F1AP_Established",
+        "UE_RRC_Pending",
+        "UE_RRC_Established",
+        "UE_Context_Modification_Received",
+        "GTP_U_Tunnel_Active"
       ],
       "transitions": [
         {
-          "from": "F1AP_DOWN",
-          "to": "F1AP_SETUP_SENT",
-          "on": "F1_SETUP_REQUEST_SENT"
+          "from": "Idle",
+          "to": "F1AP_Not_Established",
+          "on": "System Start"
         },
         {
-          "from": "F1AP_SETUP_SENT",
-          "to": "F1AP_UP_IDLE",
-          "on": "F1_SETUP_RESPONSE_RECEIVED"
+          "from": "F1AP_Not_Established",
+          "to": "F1AP_Established",
+          "on": "F1AP_SETUP_COMPLETE",
+          "guard": "Valid F1AP Setup procedure"
         },
         {
-          "from": "F1AP_UP_IDLE",
-          "to": "UE_CONTEXT_SETUP_IN_PROGRESS",
-          "on": "UE_CONTEXT_SETUP_REQUEST_RECEIVED"
+          "from": "F1AP_Not_Established",
+          "to": "UE_RRC_Pending",
+          "on": "initialRRCTransfer",
+          "guard": "Mutated DU ID and Transaction ID (Attacker)"
         },
         {
-          "from": "UE_CONTEXT_SETUP_IN_PROGRESS",
-          "to": "UE_CONTEXT_ACTIVE",
-          "on": "UE_CONTEXT_SETUP_SUCCESS",
-          "guard": "GTP_U_INSTANCE_CREATED"
+          "from": "UE_RRC_Pending",
+          "to": "UE_RRC_Established",
+          "on": "RRC Setup Success"
         },
         {
-          "from": "UE_CONTEXT_ACTIVE",
-          "to": "UE_CONTEXT_MODIFICATION_IN_PROGRESS",
-          "on": "UEContextModificationRequest_RECEIVED"
+          "from": "UE_RRC_Established",
+          "to": "UE_Context_Modification_Received",
+          "on": "UEContextModificationRequest"
         },
         {
-          "from": "UE_CONTEXT_MODIFICATION_IN_PROGRESS",
-          "to": "UE_CONTEXT_ACTIVE",
-          "on": "UEContextModificationResponse_SENT",
-          "guard": "GTP_U_INSTANCE_MODIFIED"
+          "from": "UE_Context_Modification_Received",
+          "to": "GTP_U_Tunnel_Active",
+          "on": "Initiate GTP-U",
+          "guard": "F1AP_Established is FALSE AND UE_RRC_Established is TRUE (Bug Condition)"
         },
         {
-          "from": "UE_CONTEXT_ACTIVE",
-          "to": "F1AP_UP_IDLE",
-          "on": "UE_CONTEXT_RELEASED"
-        },
-        {
-          "from": "F1AP_UP_IDLE",
-          "to": "F1AP_DOWN",
-          "on": "F1_RELEASE_REQUEST_RECEIVED"
+          "from": "GTP_U_Tunnel_Active",
+          "to": "Idle",
+          "on": "UE_Context_Release"
         }
       ]
     },
     "assumptions": [
-      "The F1AP Setup procedure must be completed successfully before any UE context management procedures (like setup or modification) can proceed.",
-      "A GTP-U instance is established or modified as part of UE Context Setup or Modification procedures.",
-      "The gNB-DU is the entity responsible for managing the F1AP interface state and UE contexts on its side.",
-      "A UEContextModificationRequest implies an existing UE context that needs to be updated."
+      "The attacker has the capability to spoof F1AP and RRC messages with specific, mutated IDs (DU ID, Transaction ID).",
+      "The gNB-CU processes the attacker's spoofed 'incorrect UE Context Setup Request' and 'UE Context Setup Success' messages, leading it to believe a UE context is established and subsequently sending a 'UEContextModificationRequest'.",
+      "The gNB-DU processes the attacker's spoofed 'initialRRCTransfer' and 'RRC Setup Success' messages, even with mutated IDs, to establish a partial RRC context.",
+      "The gNB-DU's logic for handling 'UEContextModificationRequest' does not sufficiently verify the F1AP setup status when a partial RRC context (established by attacker messages) exists.",
+      "The 'F1AP Setup procedure' refers to the establishment of the F1 interface between gNB-CU and gNB-DU, which should precede UE context management and GTP-U tunnel creation."
     ],
     "questions": [
-      "What is the expected error handling or rejection mechanism for UEContextModificationRequest if received before F1AP Setup is complete?",
-      "Does the UEContextModificationRequest always refer to an existing UE context, or can it implicitly create one in specific scenarios (e.g., certain handover types)?",
-      "Are there any other F1AP messages that might be incorrectly processed by the gNB-DU before F1AP Setup is complete?",
-      "Is there a specific F1AP message or timer that indicates F1AP link establishment status at the gNB-DU?"
+      "What specific validation checks are missing in the gNB-DU's handling of 'initialRRCTransfer' and 'UEContextModificationRequest' regarding F1AP interface status and ID authenticity?",
+      "How does the gNB-CU react to the 'incorrect UE Context Setup Request' and 'UE Context Setup Success' messages? Does it create a phantom UE context, and what are its properties?",
+      "What are the security implications of an unauthenticated GTP-U tunnel being established, particularly regarding data plane integrity and confidentiality?",
+      "Is there any mechanism for the gNB-CU to detect that the F1AP Setup procedure was bypassed by the gNB-DU, or that a GTP-U tunnel was created without proper F1AP signaling?",
+      "Are there any other conditions (e.g., specific timers, sequence numbers, security context) that could prevent or mitigate this attack sequence?"
     ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "Directionality",
-        "result": "PASS",
-        "evidence": [
-          "sequence_diagram"
-        ]
-      },
-      {
-        "name": "Req/Resp pairing",
-        "result": "PASS",
-        "evidence": [
-          "sequence_diagram"
-        ]
-      },
-      {
-        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
-        "result": "UNKNOWN",
-        "evidence": []
-      },
-      {
-        "name": "Transaction scoping",
+        "name": "directionality",
         "result": "FAIL",
         "evidence": [
-          "sequence_diagram: UEContextModificationRequest precond 'F1AP interface established'",
-          "state_machine: UEContextModificationRequest_RECEIVED transition only from UE_CONTEXT_ACTIVE (which requires F1AP_UP_IDLE)",
-          "bug_card: 'gNB-DU bypasses F1AP Setup procedure when receiving UEContextModificationRequest'"
+          "sequence_diagram step 2: Attacker (spoofing gNB-DU) -> gNB-CU: UE Context Setup Success. This message is typically a response from gNB-CU to gNB-DU, not the other way around, indicating a directionality violation.",
+          "slice_4_UE_Context_Setup_Success.md (implied specification for message direction)"
         ]
       },
       {
-        "name": "No-pending-request on new request",
+        "name": "req/resp pairing",
+        "result": "FAIL",
+        "evidence": [
+          "sequence_diagram steps 5 and 6: The UEContextModificationRequest from gNB-CU leads to an internal Initiate GTP-U Tunnel Creation by the gNB-DU, rather than a standard F1AP response back to the gNB-CU.",
+          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST and \u00a78.3.4.2 Successful Operation (imply a corresponding F1AP response message that is not observed)"
+        ]
+      },
+      {
+        "name": "ID binding",
+        "result": "FAIL",
+        "evidence": [
+          "bug_card.observed_behavior: 'initialRRCTransfer with mutated DU ID and Transaction ID'",
+          "bug_card.key_ids: 'mutated Transaction ID', 'mutated DU ID'",
+          "sequence_diagram step 3: 'initialRRCTransfer (mutated DU ID, Transaction ID)'",
+          "state_machine transition from F1AP_Not_Established to UE_RRC_Pending is guarded by 'Mutated DU ID and Transaction ID (Attacker)', indicating acceptance of invalid IDs.",
+          "\u00a79.3.1.4 gNB-CU UE F1AP ID, \u00a79.3.1.5 gNB-DU UE F1AP ID, F1AP_get_next_transaction_identifier (specifications for IDs that are being mutated)"
+        ]
+      },
+      {
+        "name": "transaction scoping",
+        "result": "FAIL",
+        "evidence": [
+          "bug_card.observed_behavior: 'The gNB-DU bypasses the F1AP Setup procedure... and directly initiates a GTP-U instance.'",
+          "state_machine transition from UE_Context_Modification_Received to GTP_U_Tunnel_Active is guarded by 'F1AP_Established is FALSE AND UE_RRC_Established is TRUE (Bug Condition)', explicitly showing GTP-U tunnel creation without F1AP setup.",
+          "slice_1_F1AP_Setup_procedure.md (implies F1AP Setup is a prerequisite for subsequent transactions like UE context modification and GTP-U setup)"
+        ]
+      },
+      {
+        "name": "no-pending-request on new request",
         "result": "UNKNOWN",
         "evidence": []
       },
       {
-        "name": "Timer preconditions",
+        "name": "timer preconditions",
         "result": "UNKNOWN",
         "evidence": []
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The sequence diagram for UEContextModificationRequest explicitly lists 'F1AP interface established' as a precondition. Furthermore, the state machine indicates that a UEContextModificationRequest_RECEIVED event can only transition from the UE_CONTEXT_ACTIVE state, which is only reachable after the F1AP interface has been established (via F1AP_UP_IDLE). The observed behavior, where the gNB-DU bypasses the F1AP Setup procedure when receiving UEContextModificationRequest, directly contradicts these defined preconditions and state transitions. This indicates a deviation in the implementation from the expected protocol flow, hence an implementation bug."
+    "rationale": "The gNB-DU's implementation exhibits multiple failures in state management and validation. It accepts messages with mutated identifiers, bypasses the mandatory F1AP Setup procedure, and proceeds to establish a GTP-U tunnel in an inconsistent state where F1AP is not established. This indicates a fundamental flaw in the gNB-DU's logic for enforcing protocol preconditions and validating context, allowing an attacker to force an insecure operational state. Additionally, the gNB-DU fails to provide a standard F1AP response to a UEContextModificationRequest, further highlighting a deviation from expected protocol behavior."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "slice_1_F1AP_Setup_procedure.md",
+        "slice_4_UE_Context_Setup_Success.md",
         "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-        "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST"
+        "\u00a78.3.4.2 Successful Operation",
+        "\u00a79.3.1.4 gNB-CU UE F1AP ID",
+        "\u00a79.3.1.5 gNB-DU UE F1AP ID",
+        "slice_1_F1AP_Setup_procedure.md",
+        "\u00a79.3.2.1 UP Transport Layer Information",
+        "\u00a79.3.2.2 GTP-TEID",
+        "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST",
+        "\u00a78.3.1.2 Successful Operation",
+        "\u00a78.3.1.3 Unsuccessful Operation",
+        "\u00a78.3.1.4 Abnormal Conditions",
+        "slice_5_initialRRCTransfer.md",
+        "slice_6_RRC_Setup_Success.md"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_du_task.c",
-        "openair2/F1AP/f1ap_du_ue_context_management.c",
-        "openair3/ocp-gtpu/gtp_itf.cpp",
-        "openair2/F1AP/f1ap_du_interface_management.c"
+        "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
+        "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST",
+        "openair3/ocp-gtpu/gtp_itf.cpp:newGtpuCreateTunnel",
+        "openair3/ocp-gtpu/gtp_itf.cpp:gtpv1uTask",
+        "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c:deliver_pdu_drb_gnb",
+        "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c:add_drb",
+        "openair2/F1AP/f1ap_du_task.c:F1AP_DU_task",
+        "openair2/F1AP/f1ap_du_task.c:du_create_gtpu_instance_to_cu",
+        "openair2/F1AP/f1ap_cu_task.c:F1AP_CU_task",
+        "openair2/F1AP/f1ap_cu_task.c:cu_task_create_gtpu_instance",
+        "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message",
+        "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data",
+        "openair2/F1AP/f1ap_ids.c:F1AP_get_next_transaction_identifier",
+        "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "openair2/F1AP/f1ap_du_interface_management.c:DU_send_F1_SETUP_REQUEST",
+        "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST"
       ],
-      "expected_vs_observed": "The expected behavior, as indicated by specifications and state machine transitions, is that the F1AP Setup procedure must be completed and the F1AP interface established before the gNB-DU processes a UEContextModificationRequest. A UEContextModificationRequest is a follow-up procedure that assumes an active UE context and an established F1AP interface. However, the observed behavior is that the gNB-DU bypasses the F1AP Setup procedure when receiving a UEContextModificationRequest, and directly proceeds to start a GTP-U instance, violating the precondition for the UEContextModificationRequest."
+      "expected_vs_observed": "The expected behavior, as per F1AP specifications, dictates that the F1AP Setup procedure must be successfully completed before the gNB-DU can establish a GTP-U instance or process UE context modifications that require GTP-U tunnel creation. Furthermore, messages like UE Context Setup Success should adhere to strict directionality (gNB-CU to gNB-DU), and all F1AP IDs and Transaction IDs must be valid and unmutated. A UEContextModificationRequest is also expected to elicit a standard F1AP response. However, the observed behavior shows that the gNB-DU bypasses the F1AP Setup procedure and directly initiates a GTP-U instance upon receiving a UEContextModificationRequest, triggered by a sequence of attacker-initiated messages. This sequence includes an incorrectly directed UE Context Setup Success message (gNB-DU spoofing gNB-CU) and an initialRRCTransfer message containing mutated DU ID and Transaction ID, which the gNB-DU accepts, leading to the creation of a GTP-U tunnel without the prerequisite F1AP setup or a proper F1AP response to the modification request."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-DU processes a UEContextModificationRequest and initiates a GTP-U instance without first completing the F1AP Setup procedure. This violates the F1AP protocol specification, which requires an established F1AP interface as a precondition for UE context modification procedures. The 'Transaction scoping' invariant check failed, confirming this protocol violation.",
+      "rationale": "The gNB-DU implementation exhibits multiple non-conformances to the F1AP specification. It bypasses the mandatory F1AP Setup procedure, directly initiating a GTP-U instance. The gNB-DU accepts F1AP messages with incorrect directionality (e.g., UE Context Setup Success spoofed by an attacker) and invalid/mutated F1AP IDs (DU ID, Transaction ID) in initialRRCTransfer. Furthermore, it fails to send a proper F1AP response to a UEContextModificationRequest. These issues indicate a lack of robust state machine enforcement and input validation, allowing an attacker to subvert critical F1AP procedures.",
       "citations": {
         "spec": [
-          "slice_1_F1AP_Setup_procedure.md",
+          "slice_4_UE_Context_Setup_Success.md",
           "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-          "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST"
+          "\u00a78.3.4.2 Successful Operation",
+          "\u00a79.3.1.4 gNB-CU UE F1AP ID",
+          "\u00a79.3.1.5 gNB-DU UE F1AP ID",
+          "slice_1_F1AP_Setup_procedure.md",
+          "\u00a79.3.2.1 UP Transport Layer Information",
+          "\u00a79.3.2.2 GTP-TEID",
+          "\u00a79.2.2.1 UE CONTEXT SETUP REQUEST",
+          "\u00a78.3.1.2 Successful Operation",
+          "\u00a78.3.1.3 Unsuccessful Operation",
+          "\u00a78.3.1.4 Abnormal Conditions",
+          "slice_5_initialRRCTransfer.md",
+          "slice_6_RRC_Setup_Success.md"
         ],
         "code": [
-          "openair2/F1AP/f1ap_du_task.c",
-          "openair2/F1AP/f1ap_du_ue_context_management.c",
-          "openair3/ocp-gtpu/gtp_itf.cpp",
-          "openair2/F1AP/f1ap_du_interface_management.c"
+          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
+          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_SETUP_REQUEST",
+          "openair3/ocp-gtpu/gtp_itf.cpp:newGtpuCreateTunnel",
+          "openair3/ocp-gtpu/gtp_itf.cpp:gtpv1uTask",
+          "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c:deliver_pdu_drb_gnb",
+          "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.c:add_drb",
+          "openair2/F1AP/f1ap_du_task.c:F1AP_DU_task",
+          "openair2/F1AP/f1ap_du_task.c:du_create_gtpu_instance_to_cu",
+          "openair2/F1AP/f1ap_cu_task.c:F1AP_CU_task",
+          "openair2/F1AP/f1ap_cu_task.c:cu_task_create_gtpu_instance",
+          "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message",
+          "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data",
+          "openair2/F1AP/f1ap_ids.c:F1AP_get_next_transaction_identifier",
+          "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+          "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_handle_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+          "openair2/F1AP/f1ap_du_interface_management.c:DU_send_F1_SETUP_REQUEST",
+          "openair2/F1AP/f1ap_cu_interface_management.c:CU_handle_F1_SETUP_REQUEST"
         ]
       },
       "suggested_repro": [
-        "1. Ensure the F1AP interface between gNB-CU and gNB-DU is not established.",
-        "2. Trigger a scenario where the gNB-CU sends a UEContextModificationRequest to the gNB-DU.",
-        "3. Observe if the gNB-DU attempts to process the request and start a GTP-U instance without prior F1AP Setup."
+        "1. Attacker sends an incorrect UE Context Setup Request to gNB-CU.",
+        "2. Attacker (spoofing gNB-DU) sends a UE Context Setup Success message to gNB-CU.",
+        "3. Attacker sends an initialRRCTransfer message with a mutated DU ID and Transaction ID.",
+        "4. Attacker sends an RRC Setup Success message.",
+        "5. gNB-CU sends a UEContextModificationRequest to the gNB-DU.",
+        "6. Observe that the gNB-DU directly initiates a GTP-U instance, bypassing the F1AP Setup procedure and without sending a proper F1AP response to the UEContextModificationRequest."
       ],
       "risks": [
-        "Service disruption or failure to establish UE context.",
-        "Incorrect resource allocation or deallocation.",
-        "Protocol state inconsistencies between gNB-CU and gNB-DU.",
-        "Potential for security vulnerabilities due to improper state management."
+        "Unauthorized GTP-U tunnel establishment, potentially leading to data plane compromise.",
+        "Bypassing of critical F1AP security and setup procedures.",
+        "Potential for resource exhaustion or denial of service due to unvalidated tunnel creation.",
+        "Exposure to man-in-the-middle attacks or unauthorized access to user plane traffic.",
+        "Compromise of UE context and related security parameters."
       ],
       "next_steps": [
-        "1. Review and correct the gNB-DU's F1AP state machine implementation to ensure UEContextModificationRequest processing is gated by an established F1AP interface.",
-        "2. Implement or correct the F1AP Setup procedure to ensure it completes before any UE context modification.",
-        "3. Add comprehensive logging to track F1AP interface establishment status and UE context state transitions for better debugging."
+        "Implement strict F1AP state machine enforcement in the gNB-DU, ensuring F1AP Setup completion before any subsequent F1AP procedures or GTP-U tunnel creation.",
+        "Add robust validation for F1AP message directionality, rejecting messages from incorrect senders.",
+        "Implement comprehensive validation for all F1AP IDs (e.g., gNB-CU UE F1AP ID, gNB-DU UE F1AP ID, Transaction ID) to prevent acceptance of mutated or invalid identifiers.",
+        "Ensure that the gNB-DU sends appropriate F1AP response messages for all F1AP requests, such as UEContextModificationRequest.",
+        "Review and update the logic in `DU_handle_UE_CONTEXT_MODIFICATION_REQUEST` and `du_create_gtpu_instance_to_cu` to incorporate these checks and state transitions."
       ]
     }
   }

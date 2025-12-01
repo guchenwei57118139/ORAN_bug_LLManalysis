@@ -1,0 +1,421 @@
+{
+  "step1": {
+    "bug_card": {
+      "observed_behavior": "The gNB-CU (OAI NG-RAN) accepts a PDU SESSION RESOURCE RELEASE COMMAND from the AMF for a non-existent PDU-Session-ID (e.g., 99). Although the gNB-CU logs a warning internally, it returns a PDU SESSION RESOURCE RELEASE RESPONSE to the AMF without indicating that the PDU session was unknown or non-existent, implying a successful release.",
+      "interface_guess": [
+        "NGAP"
+      ],
+      "procedure_guess": [
+        "PDU Session Resource Release"
+      ],
+      "components_involved": [
+        "AMF",
+        "gNB-CU"
+      ],
+      "signals_or_timers": [
+        "PDU SESSION RESOURCE RELEASE COMMAND",
+        "PDU SESSION RESOURCE RELEASE RESPONSE"
+      ]
+    }
+  },
+  "step2": {
+    "candidate_spec_sections": [
+      {
+        "Keywords": [
+          "PDU Session Resource Release",
+          "procedure",
+          "NGAP",
+          "AMF",
+          "gNB-CU",
+          "flow"
+        ],
+        "title": [
+          "PDU Session Resource Release Procedure Overview"
+        ]
+      },
+      {
+        "Keywords": [
+          "PDU SESSION RESOURCE RELEASE COMMAND",
+          "message",
+          "NGAP",
+          "information elements",
+          "PDU Session ID"
+        ],
+        "title": [
+          "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition"
+        ]
+      },
+      {
+        "Keywords": [
+          "PDU SESSION RESOURCE RELEASE RESPONSE",
+          "message",
+          "NGAP",
+          "information elements",
+          "cause value",
+          "failure"
+        ],
+        "title": [
+          "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition"
+        ]
+      },
+      {
+        "Keywords": [
+          "error handling",
+          "abnormal cases",
+          "PDU Session ID",
+          "non-existent",
+          "unknown",
+          "cause value",
+          "failure indication"
+        ],
+        "title": [
+          "Error Handling and Abnormal Conditions",
+          "Handling of Unknown PDU Session ID"
+        ]
+      }
+    ],
+    "expected_behaviour": "The gNB-CU should not accept a PDU SESSION RESOURCE RELEASE COMMAND for a non-existent PDU-Session-ID. Instead, it should indicate to the AMF that the PDU session is unknown or non-existent, likely by returning a PDU SESSION RESOURCE RELEASE RESPONSE with an appropriate cause value indicating the failure."
+  },
+  "step3": {
+    "candidate_code": [
+      {
+        "path": "openair3/NGAP/ngap_gNB_handlers.c",
+        "function_name": "ngap_gNB_handle_pdusession_release_command",
+        "reason": "This function is the entry point for handling the PDU SESSION RESOURCE RELEASE COMMAND from the AMF. It needs to be inspected to understand how it processes the PDU Session ID and forwards the request to the RRC layer, especially for non-existent PDU sessions."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+        "function_name": "ngap_gNB_pdusession_release_resp",
+        "reason": "This function is responsible for constructing and sending the PDU SESSION RESOURCE RELEASE RESPONSE to the AMF. The bug description indicates that the response does not correctly signal a failure for non-existent PDU sessions, implying this function needs modification to include a list of failed Pessions with appropriate cause values."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_ue_context.c",
+        "function_name": "ngap_get_ue_context",
+        "reason": "This file and its functions manage the UE contexts within the gNB. To correctly validate if a PDU Session ID exists for a given UE, the internal structure of UE contexts and how PDU sessions are stored and retrieved needs to be understood. A new function might be needed to specifically look up PDU sessions within a UE context."
+      },
+      {
+        "path": "openair2/COMMON/ngap_messages_def.h",
+        "function_name": "ngap_pdusession_release_resp_t",
+        "reason": "This header defines the ITTI message structure for the PDU session release response. It likely needs to be extended to include fields for reporting failed PDU session releases, which will then be populated by the ngap_gNB_pdusession_release_resp function."
+      },
+      {
+        "path": "openair3/NGAP/ngap_common.c",
+        "function_name": "encode_ngap_cause",
+        "reason": "This function is used to encode cause values in NGAP messages. It will be essential for correctly reporting the 'unknown PDU session ID' cause in the PDU SESSION RESOURCE RELEASE RESPONSE."
+      },
+      {
+        "path": "openair3/NGAP/ngap_msg_includes.h",
+        "function_name": "NGAP_PDUSessionResourceReleaseResponse_t",
+        "reason": "This header contains the ASN.1 definitions for NGAP messages. Specifically, the structure for PDU Session Resource Release Response needs to be checked for the presence and usage of 'NGAP_PDUSessionResourceFailedToReleaseListRelRes' to report failures."
+      }
+    ],
+    "control": {
+      "decision": "continue",
+      "fetch_requests": [
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_handlers.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_ue_context.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/COMMON/ngap_messages_def.h",
+          "suffix": [
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_common.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_msg_includes.h",
+          "suffix": [
+            "h"
+          ],
+          "max_files": 1
+        }
+      ]
+    }
+  },
+  "step4": {
+    "snippets": [
+      {
+        "kind": "spec",
+        "source": "PDU Session Resource Release Procedure Overview",
+        "location": "PDU Session Resource Release Procedure Overview"
+      },
+      {
+        "kind": "spec",
+        "source": "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition",
+        "location": "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition"
+      },
+      {
+        "kind": "spec",
+        "source": "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition",
+        "location": "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition"
+      },
+      {
+        "kind": "spec",
+        "source": "Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID",
+        "location": "Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID"
+      },
+      {
+        "kind": "code",
+        "source": "ngap_gNB_handle_pdusession_release_command",
+        "location": "openair3/NGAP/ngap_gNB_handlers.c:ngap_gNB_handle_pdusession_release_command"
+      },
+      {
+        "kind": "code",
+        "source": "ngap_gNB_pdusession_release_resp",
+        "location": "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_pdusession_release_resp"
+      },
+      {
+        "kind": "code",
+        "source": "ngap_get_ue_context",
+        "location": "openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context"
+      },
+      {
+        "kind": "code",
+        "source": "ngap_pdusession_release_resp_t",
+        "location": "openair2/COMMON/ngap_messages_def.h:ngap_pdusession_release_resp_t"
+      },
+      {
+        "kind": "code",
+        "source": "encode_ngap_cause",
+        "location": "openair3/NGAP/ngap_common.c:encode_ngap_cause"
+      },
+      {
+        "kind": "code",
+        "source": "NGAP_PDUSessionResourceReleaseResponse_t",
+        "location": "openair3/NGAP/ngap_msg_includes.h:NGAP_PDUSessionResourceReleaseResponse_t"
+      }
+    ]
+  },
+  "step5": {
+    "sequence_diagram": [
+      {
+        "from": "AMF",
+        "to": "gNB-CU",
+        "message": "PDU SESSION RESOURCE RELEASE COMMAND (PDU-Session-ID=99)",
+        "precond": "AMF initiates release for a PDU session, potentially non-existent.",
+        "postcond": "gNB-CU receives the command."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU (Internal)",
+        "message": "Validate PDU Session Context for PDU-Session-ID 99",
+        "precond": "gNB-CU received PDU SESSION RESOURCE RELEASE COMMAND.",
+        "postcond": "gNB-CU determines PDU-Session-ID 99 does not exist."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "AMF",
+        "message": "PDU SESSION RESOURCE RELEASE RESPONSE (Cause: Unknown PDU Session ID)",
+        "precond": "gNB-CU found PDU-Session-ID 99 non-existent.",
+        "postcond": "AMF is informed that the PDU session could not be released because it was unknown."
+      }
+    ],
+    "state_machine": {
+      "states": [
+        "Idle",
+        "WaitingForReleaseCommand",
+        "ReleaseCommandReceived",
+        "PDU_Session_Context_Validating",
+        "PDU_Session_Context_Found",
+        "PDU_Session_Context_NotFound",
+        "SendingReleaseResponse",
+        "ReleaseComplete"
+      ],
+      "transitions": [
+        {
+          "from": "Idle",
+          "to": "WaitingForReleaseCommand",
+          "on": "System Init"
+        },
+        {
+          "from": "WaitingForReleaseCommand",
+          "to": "ReleaseCommandReceived",
+          "on": "PDU SESSION RESOURCE RELEASE COMMAND received"
+        },
+        {
+          "from": "ReleaseCommandReceived",
+          "to": "PDU_Session_Context_Validating",
+          "on": "Start PDU Session Context Check"
+        },
+        {
+          "from": "PDU_Session_Context_Validating",
+          "to": "PDU_Session_Context_Found",
+          "on": "PDU Session ID exists"
+        },
+        {
+          "from": "PDU_Session_Context_Validating",
+          "to": "PDU_Session_Context_NotFound",
+          "on": "PDU Session ID non-existent"
+        },
+        {
+          "from": "PDU_Session_Context_Found",
+          "to": "SendingReleaseResponse",
+          "on": "PDU Session Resources Released",
+          "guard": "PDU Session ID exists"
+        },
+        {
+          "from": "PDU_Session_Context_NotFound",
+          "to": "SendingReleaseResponse",
+          "on": "Prepare Error Response",
+          "guard": "PDU Session ID non-existent"
+        },
+        {
+          "from": "SendingReleaseResponse",
+          "to": "ReleaseComplete",
+          "on": "Response Sent"
+        },
+        {
+          "from": "ReleaseComplete",
+          "to": "Idle",
+          "on": "Procedure End"
+        }
+      ]
+    },
+    "assumptions": [
+      "The AMF initiates the PDU Session Resource Release procedure.",
+      "The PDU-Session-ID is a unique identifier for a PDU session within a UE context on the gNB-CU.",
+      "The gNB-CU is expected to validate the existence of the PDU-Session-ID before proceeding with resource release.",
+      "According to 3GPP specifications, an unknown PDU Session ID should result in an appropriate error indication in the PDU SESSION RESOURCE RELEASE RESPONSE.",
+      "The internal warning log in OAI correctly identifies the non-existent PDU session."
+    ],
+    "questions": [
+      "Why does the gNB-CU not set an appropriate NGAP cause value (e.g., 'Unknown PDU Session ID') in the PDU SESSION RESOURCE RELEASE RESPONSE when the PDU session is not found?",
+      "Is there a default cause value being used, or is the cause field simply omitted/left as success in the PDU SESSION RESOURCE RELEASE RESPONSE when the PDU session is not found?",
+      "Does the AMF have any mechanism to detect that a PDU session it requested to be released was not actually released, despite receiving a success response?",
+      "What are the potential implications for the AMF and overall network state if the AMF believes a non-existent PDU session was successfully released?"
+    ]
+  },
+  "step6": {
+    "invariant_checks": [
+      {
+        "name": "Message Directionality",
+        "result": "PASS",
+        "evidence": [
+          "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition",
+          "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition"
+        ]
+      },
+      {
+        "name": "Request-Response Pairing",
+        "result": "PASS",
+        "evidence": [
+          "PDU Session Resource Release Procedure Overview",
+          "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition",
+          "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition"
+        ]
+      },
+      {
+        "name": "PDU Session ID Binding and Error Indication",
+        "result": "FAIL",
+        "evidence": [
+          "Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID",
+          "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition"
+        ]
+      },
+      {
+        "name": "Transaction Scoping",
+        "result": "PASS",
+        "evidence": [
+          "PDU Session Resource Release Procedure Overview"
+        ]
+      },
+      {
+        "name": "No Pending Request on New Request",
+        "result": "UNKNOWN",
+        "evidence": []
+      },
+      {
+        "name": "Timer Preconditions",
+        "result": "UNKNOWN",
+        "evidence": []
+      }
+    ],
+    "preliminary_verdict": "spec-nonconformance",
+    "rationale": "The gNB-CU's behavior of sending a PDU SESSION RESOURCE RELEASE RESPONSE that implies success for a non-existent PDU-Session-ID directly violates the expected error handling specified in the NGAP standard. The specification, particularly in 'Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID', would require an explicit indication of the unknown PDU Session ID in the response, rather than implying a successful release. The observed behavior is a clear non-conformance with the NGAP specification for handling abnormal conditions during PDU Session Resource Release."
+  },
+  "step7": {
+    "evidence_pack": {
+      "spec_citations": [
+        "PDU Session Resource Release Procedure Overview",
+        "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition",
+        "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition",
+        "Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID"
+      ],
+      "code_citations": [
+        "openair3/NGAP/ngap_gNB_handlers.c:ngap_gNB_handle_pdusession_release_command",
+        "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_pdusession_release_resp",
+        "openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context",
+        "openair3/NGAP/ngap_common.c:encode_ngap_cause"
+      ],
+      "expected_vs_observed": "Expected behavior, as per specifications on error handling for unknown PDU Session IDs, dictates that the gNB-CU should explicitly indicate an error or reject a PDU SESSION RESOURCE RELEASE COMMAND when the PDU-Session-ID is non-existent. Conversely, the observed behavior in the OAI NG-RAN's gNB-CU is that it accepts such a command for a non-existent PDU-Session-ID, logs an internal warning, but then sends a PDU SESSION RESOURCE RELEASE RESPONSE to the AMF without any error cause, thus incorrectly signaling a successful release."
+    }
+  },
+  "step8": {
+    "report": {
+      "verdict": "spec-nonconformance",
+      "rationale": "The OAI NG-RAN's gNB-CU fails to correctly handle a PDU SESSION RESOURCE RELEASE COMMAND for a non-existent PDU-Session-ID. Instead of indicating an error or rejecting the command as per specification, it logs an internal warning but sends a PDU SESSION RESOURCE RELEASE RESPONSE to the AMF without any error cause, implying a successful release. This violates the expected error handling for unknown PDU Session IDs.",
+      "citations": {
+        "spec": [
+          "PDU Session Resource Release Procedure Overview",
+          "NGAP PDU SESSION RESOURCE RELEASE COMMAND Message Definition",
+          "NGAP PDU SESSION RESOURCE RELEASE RESPONSE Message Definition",
+          "Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID"
+        ],
+        "code": [
+          "openair3/NGAP/ngap_gNB_handlers.c:ngap_gNB_handle_pdusession_release_command",
+          "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_pdusession_release_resp",
+          "openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context",
+          "openair3/NGAP/ngap_common.c:encode_ngap_cause"
+        ]
+      },
+      "suggested_repro": [
+        "1. Establish a PDU session between a UE, OAI NG-RAN (gNB-CU), and AMF.",
+        "2. Terminate the PDU session normally to ensure no active PDU-Session-ID 99 exists.",
+        "3. From the AMF, send a PDU SESSION RESOURCE RELEASE COMMAND to the gNB-CU with a non-existent PDU-Session-ID (e.g., 99).",
+        "4. Observe the gNB-CU's logs for internal warnings.",
+        "5. Observe the PDU SESSION RESOURCE RELEASE RESPONSE sent by the gNB-CU to the AMF. Verify that it does not contain an error cause for the unknown PDU-Session-ID."
+      ],
+      "risks": [
+        "Incorrect network state synchronization between AMF and gNB-CU regarding PDU session status.",
+        "Potential for resource leakage if AMF believes a session is released but gNB-CU has internal inconsistencies.",
+        "Increased debugging complexity due to misleading success indications.",
+        "Interoperability issues with other network functions expecting correct error handling."
+      ],
+      "next_steps": [
+        "1. Review 'Error Handling and Abnormal Conditions Handling of Unknown PDU Session ID' in the 3GPP specifications.",
+        "2. Modify `ngap_gNB_handle_pdusession_release_command` in `openair3/NGAP/ngap_gNB_handlers.c` to explicitly return an error cause in the PDU SESSION RESOURCE RELEASE RESPONSE when `ngap_get_ue_context` or similar checks indicate a non-existent PDU-Session-ID.",
+        "3. Implement unit tests to cover error handling for unknown PDU-Session-IDs in PDU Session Resource Release procedures.",
+        "4. Update documentation to reflect correct error handling behavior."
+      ]
+    }
+  }
+}

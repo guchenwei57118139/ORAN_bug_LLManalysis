@@ -1,0 +1,482 @@
+{
+  "step1": {
+    "bug_card": {
+      "observed_behavior": "The gNB-CU silently discards DOWNLINK NAS TRANSPORT messages for unknown/released UE contexts and fails to send a NAS NON DELIVERY INDICATION to the AMF, leading to the AMF not being notified of the delivery failure.",
+      "interface_guess": [
+        "NGAP"
+      ],
+      "procedure_guess": [
+        "UE Context Release",
+        "Downlink NAS Transport",
+        "NAS Non Delivery Indication"
+      ],
+      "components_involved": [
+        "gNB-CU",
+        "AMF",
+        "UE"
+      ],
+      "key_ids": {
+        "transaction_id": "AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200"
+      },
+      "signals_or_timers": [
+        "DOWNLINK NAS TRANSPORT",
+        "NAS NON DELIVERY INDICATION"
+      ]
+    }
+  },
+  "step2": {
+    "candidate_spec_sections": [
+      {
+        "Keywords": [
+          "gNB-CU",
+          "UE Context Release",
+          "UE CONTEXT RELEASE COMMAND",
+          "release signalling and user data transport resources",
+          "UE Context Setup procedure",
+          "cause value of UE rejection"
+        ],
+        "title": [
+          "8.3.3 UE Context Release (gNB-CU initiated)"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE CONTEXT RELEASE COMMAND",
+          "gNB-CU",
+          "gNB-DU",
+          "release UE-associated logical F1 connection",
+          "Cause",
+          "RRC-Container",
+          "SRB ID",
+          "old gNB-DU UE F1AP ID"
+        ],
+        "title": [
+          "9.2.2.5 UE CONTEXT RELEASE COMMAND"
+        ]
+      },
+      {
+        "Keywords": [
+          "Cause",
+          "reason for a particular event",
+          "Radio Network Layer Cause",
+          "Unknown or already allocated gNB-CU UE F1AP ID",
+          "Unknown or already allocated gNB-DU UE F1AP ID",
+          "Unknown or inconsistent pair of UE F1AP ID",
+          "Normal Release",
+          "AMF initiated abnormal release",
+          "Procedure cancelled",
+          "UE rejection"
+        ],
+        "title": [
+          "9.3.1.2 Cause"
+        ]
+      },
+      {
+        "Keywords": [
+          "gNB-CU UE F1AP ID",
+          "uniquely identifies the UE association",
+          "F1 interface within the gNB-CU",
+          "INTEGER (0 .. 2^32 -1)"
+        ],
+        "title": [
+          "9.3.1.4 gNB-CU UE F1AP ID"
+        ]
+      },
+      {
+        "Keywords": [
+          "gNB-DU UE F1AP ID",
+          "uniquely identifies the UE association",
+          "F1 interface within the gNB-DU",
+          "INTEGER (0 .. 2^32 -1)"
+        ],
+        "title": [
+          "9.3.1.5 gNB-DU UE F1AP ID"
+        ]
+      }
+    ],
+    "expected_behaviour": "The gNB-CU shall not silently discard DOWNLINK NAS TRANSPORT messages for unknown or released UE contexts. Instead, it shall send a NAS NON DELIVERY INDICATION to the AMF, providing an appropriate cause value to notify the AMF of the delivery failure."
+  },
+  "step3": {
+    "candidate_code": [
+      {
+        "path": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+        "function_name": "ngap_gNB_handle_nas_downlink",
+        "reason": "This function is the primary handler for DOWNLINK NAS TRANSPORT messages. The bug states that these messages are silently discarded for unknown/released UE contexts, and this function contains the logic to check for existing UE contexts using `ngap_get_ue_context`."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+        "function_name": "ngap_gNB_nas_non_delivery_ind",
+        "reason": "This function is responsible for sending the NAS NON DELIVERY INDICATION message to the AMF. The bug states that this indication is not sent when a DOWNLINK NAS TRANSPORT message fails delivery."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_ue_context.c",
+        "function_name": "ngap_get_ue_context",
+        "reason": "This function is used by `ngap_gNB_handle_nas_downlink` to retrieve the UE context. The bug specifically mentions 'unknown/released UE contexts', which would result in a NULL return from this function."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_ue_context.c",
+        "function_name": "ngap_detach_ue_context",
+        "reason": "This function is responsible for removing UE contexts, which could lead to a 'released UE context' state relevant to the bug."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_handlers.c",
+        "function_name": "ngap_gNB_handle_message",
+        "reason": "This is the top-level dispatcher for all incoming NGAP messages, including DOWNLINK NAS TRANSPORT. It orchestrates the call to specific handlers like `ngap_gNB_handle_nas_downlink`."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_handlers.c",
+        "function_name": "ngap_gNB_handle_ue_context_release_command",
+        "reason": "This function handles the UE Context Release Command, which directly impacts the state of UE contexts (making them 'released')."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_itti_messaging.c",
+        "function_name": "ngap_gNB_itti_send_sctp_data_req",
+        "reason": "This function is used to send SCTP data, which is the underlying mechanism for sending NGAP messages like NAS NON DELIVERY INDICATION."
+      },
+      {
+        "path": "openair2/COMMON/ngap_messages_types.h",
+        "function_name": "ngap_nas_non_delivery_ind_t",
+        "reason": "This header defines the structure for the NAS NON DELIVERY INDICATION ITTI message, which is central to the bug fix."
+      },
+      {
+        "path": "openair3/NAS/COMMON/EMM/MSG/DownlinkNasTransport.c",
+        "function_name": "decode_downlink_nas_transport",
+        "reason": "This function decodes the NAS PDU carried within the NGAP DOWNLINK NAS TRANSPORT message. The NAS PDU content is required for the NAS NON DELIVERY INDICATION."
+      },
+      {
+        "path": "openair3/NAS/COMMON/EMM/MSG/emm_msg.c",
+        "function_name": "emm_msg_decode",
+        "reason": "This function is a higher-level NAS message decoder that would be involved in processing the NAS PDU from the DOWNLINK NAS TRANSPORT message."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_encoder.c",
+        "function_name": "ngap_gNB_encode_pdu",
+        "reason": "This function is responsible for encoding NGAP PDUs, including the NAS NON DELIVERY INDICATION message."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_decoder.c",
+        "function_name": "ngap_gNB_decode_pdu",
+        "reason": "This function is responsible for decoding incoming NGAP PDUs, including the DOWNLINK NAS TRANSPORT message."
+      }
+    ],
+    "control": {
+      "decision": "stop"
+    }
+  },
+  "step4": {
+    "snippets": [
+      {
+        "kind": "spec",
+        "source": "8.3.3 UE Context Release (gNB-CU initiated)",
+        "location": "8.3.3 UE Context Release (gNB-CU initiated)"
+      },
+      {
+        "kind": "spec",
+        "source": "9.2.2.5 UE CONTEXT RELEASE COMMAND",
+        "location": "9.2.2.5 UE CONTEXT RELEASE COMMAND"
+      },
+      {
+        "kind": "spec",
+        "source": "9.3.1.2 Cause",
+        "location": "9.3.1.2 Cause"
+      },
+      {
+        "kind": "spec",
+        "source": "9.3.1.4 gNB-CU UE F1AP ID",
+        "location": "9.3.1.4 gNB-CU UE F1AP ID"
+      },
+      {
+        "kind": "spec",
+        "source": "9.3.1.5 gNB-DU UE F1AP ID",
+        "location": "9.3.1.5 gNB-DU UE F1AP ID"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_nas_procedures.c ngap_gNB_handle_nas_downlink",
+        "location": "openair3/NGAP/ngap_gNB_nas_procedures.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_nas_procedures.c ngap_gNB_nas_non_delivery_ind",
+        "location": "openair3/NGAP/ngap_gNB_nas_procedures.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_ue_context.c ngap_get_ue_context",
+        "location": "openair3/NGAP/ngap_gNB_ue_context.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_ue_context.c ngap_detach_ue_context",
+        "location": "openair3/NGAP/ngap_gNB_ue_context.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_handlers.c ngap_gNB_handle_message",
+        "location": "openair3/NGAP/ngap_gNB_handlers.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_handlers.c ngap_gNB_handle_ue_context_release_command",
+        "location": "openair3/NGAP/ngap_gNB_handlers.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_itti_messaging.c ngap_gNB_itti_send_sctp_data_req",
+        "location": "openair3/NGAP/ngap_gNB_itti_messaging.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair2/COMMON/ngap_messages_types.h ngap_nas_non_delivery_ind_t",
+        "location": "openair2/COMMON/ngap_messages_types.h"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NAS/COMMON/EMM/MSG/DownlinkNasTransport.c decode_downlink_nas_transport",
+        "location": "openair3/NAS/COMMON/EMM/MSG/DownlinkNasTransport.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NAS/COMMON/EMM/MSG/emm_msg.c emm_msg_decode",
+        "location": "openair3/NAS/COMMON/EMM/MSG/emm_msg.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_encoder.c ngap_gNB_encode_pdu",
+        "location": "openair3/NGAP/ngap_gNB_encoder.c"
+      },
+      {
+        "kind": "code",
+        "source": "openair3/NGAP/ngap_gNB_decoder.c ngap_gNB_decode_pdu",
+        "location": "openair3/NGAP/ngap_gNB_decoder.c"
+      }
+    ]
+  },
+  "step5": {
+    "sequence_diagram": [
+      {
+        "from": "AMF",
+        "to": "gNB-CU",
+        "message": "UE CONTEXT RELEASE COMMAND (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200)",
+        "precond": "UE context for (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200) exists on gNB-CU.",
+        "postcond": "gNB-CU initiates release of UE context."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Remove UE Context (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200)",
+        "precond": "gNB-CU received UE CONTEXT RELEASE COMMAND.",
+        "postcond": "UE context for (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200) is removed from gNB-CU's active contexts."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "AMF",
+        "message": "UE CONTEXT RELEASE COMPLETE (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200)",
+        "precond": "UE context removed from gNB-CU.",
+        "postcond": "AMF acknowledges UE context release."
+      },
+      {
+        "from": "AMF",
+        "to": "gNB-CU",
+        "message": "DOWNLINK NAS TRANSPORT (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200)",
+        "precond": "AMF sends NAS message for UE (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200). UE context for this UE is NOT found on gNB-CU.",
+        "postcond": "gNB-CU receives the message."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Attempt UE Context Lookup (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200)",
+        "precond": "gNB-CU received DOWNLINK NAS TRANSPORT.",
+        "postcond": "Lookup fails, UE context not found."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Silently Discard DOWNLINK NAS TRANSPORT",
+        "precond": "UE context lookup failed.",
+        "postcond": "Message is dropped without notification to AMF. (This is the bug)"
+      },
+      {
+        "from": "gNB-CU",
+        "to": "AMF",
+        "message": "NAS NON DELIVERY INDICATION (AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200)",
+        "precond": "gNB-CU failed to deliver DOWNLINK NAS TRANSPORT due to unknown/released UE context.",
+        "postcond": "AMF is notified of the delivery failure for the NAS message. (This message is MISSING in the bug scenario)"
+      }
+    ],
+    "state_machine": {
+      "states": [
+        "UE_Context_Inactive",
+        "UE_Context_Active",
+        "UE_Context_Releasing",
+        "DL_NAS_Transport_Received",
+        "DL_NAS_Transport_Delivered",
+        "DL_NAS_Transport_Discarded_Silently",
+        "NAS_Non_Delivery_Ind_Sent"
+      ],
+      "transitions": [
+        {
+          "from": "UE_Context_Inactive",
+          "to": "UE_Context_Active",
+          "on": "UE Context Setup Request"
+        },
+        {
+          "from": "UE_Context_Active",
+          "to": "UE_Context_Releasing",
+          "on": "UE CONTEXT RELEASE COMMAND"
+        },
+        {
+          "from": "UE_Context_Releasing",
+          "to": "UE_Context_Inactive",
+          "on": "UE CONTEXT RELEASE COMPLETE"
+        },
+        {
+          "from": "UE_Context_Active",
+          "to": "DL_NAS_Transport_Received",
+          "on": "DOWNLINK NAS TRANSPORT"
+        },
+        {
+          "from": "UE_Context_Inactive",
+          "to": "DL_NAS_Transport_Received",
+          "on": "DOWNLINK NAS TRANSPORT"
+        },
+        {
+          "from": "UE_Context_Releasing",
+          "to": "DL_NAS_Transport_Received",
+          "on": "DOWNLINK NAS TRANSPORT"
+        },
+        {
+          "from": "DL_NAS_Transport_Received",
+          "to": "DL_NAS_Transport_Delivered",
+          "on": "UE Context Found",
+          "guard": "UE_Context_Active"
+        },
+        {
+          "from": "DL_NAS_Transport_Received",
+          "to": "DL_NAS_Transport_Discarded_Silently",
+          "on": "UE Context Not Found",
+          "guard": "UE_Context_Inactive OR UE_Context_Releasing"
+        },
+        {
+          "from": "DL_NAS_Transport_Delivered",
+          "to": "UE_Context_Active",
+          "on": "NAS Message Forwarded"
+        },
+        {
+          "from": "DL_NAS_Transport_Discarded_Silently",
+          "to": "NAS_Non_Delivery_Ind_Sent",
+          "on": "Trigger NAS Non Delivery Indication"
+        },
+        {
+          "from": "NAS_Non_Delivery_Ind_Sent",
+          "to": "UE_Context_Inactive",
+          "on": "Indication Sent"
+        }
+      ]
+    },
+    "assumptions": [
+      "The UE Context Release procedure successfully removes the UE context from the gNB-CU.",
+      "The DOWNLINK NAS TRANSPORT message arrives at the gNB-CU after the corresponding UE context has been released.",
+      "The gNB-CU is expected to validate the existence of an active UE context for any incoming DOWNLINK NAS TRANSPORT message.",
+      "The NAS NON DELIVERY INDICATION is the specified mechanism for the gNB-CU to inform the AMF about failed NAS message delivery.",
+      "The AMF-UE-NGAP-ID and RAN-UE-NGAP-ID in the DOWNLINK NAS TRANSPORT message are valid identifiers for the UE whose context was released."
+    ],
+    "questions": [
+      "What specific Cause value (as per 3GPP TS 38.413, 9.3.1.2) should be used in the NAS NON DELIVERY INDICATION when the UE context is unknown or released?",
+      "Does the AMF have a timer for DOWNLINK NAS TRANSPORT messages, which would eventually trigger a retransmission or alternative action if no NAS NON DELIVERY INDICATION is received?",
+      "Are there other conditions (e.g., UE unreachable, radio link failure) that would also necessitate a NAS NON DELIVERY INDICATION for DOWNLINK NAS TRANSPORT messages?",
+      "Does the gNB-CU maintain any temporary state for recently released UEs that could facilitate sending the NAS NON DELIVERY INDICATION even if the full UE context is no longer active?"
+    ]
+  },
+  "step6": {
+    "invariant_checks": [
+      {
+        "name": "Directionality of Messages",
+        "result": "PASS",
+        "evidence": [
+          "All messages in the sequence diagram (UE CONTEXT RELEASE COMMAND, UE CONTEXT RELEASE COMPLETE, DOWNLINK NAS TRANSPORT) are directed between AMF and gNB-CU as expected for their respective roles. The missing NAS NON DELIVERY INDICATION would also be gNB-CU to AMF, which is the correct direction."
+        ]
+      },
+      {
+        "name": "Req/Resp Pairing and Error Notification",
+        "result": "FAIL",
+        "evidence": [
+          "The DOWNLINK NAS TRANSPORT message, when sent by the AMF for a UE context no longer present at the gNB-CU, should trigger a NAS NON DELIVERY INDICATION from the gNB-CU back to the AMF. The bug_card.observed_behavior explicitly states that the gNB-CU 'fails to send a NAS NON DELIVERY INDICATION'. The sequence_diagram step 7 also highlights this message as 'MISSING'. The existence of 'ngap_gNB_nas_non_delivery_ind' in 'openair3/NGAP/ngap_gNB_nas_procedures.c' and 'ngap_nas_non_delivery_ind_t' in 'openair2/COMMON/ngap_messages_types.h' confirms the expectation of such a notification."
+        ]
+      },
+      {
+        "name": "ID Binding Consistency",
+        "result": "PASS",
+        "evidence": [
+          "The AMF-UE-NGAP-ID and RAN-UE-NGAP-ID (100 and 200 respectively) are consistently used across the UE CONTEXT RELEASE COMMAND, UE CONTEXT RELEASE COMPLETE, and DOWNLINK NAS TRANSPORT messages. The issue is not with ID binding itself, but with the handling of a message for a context that was previously identified by these IDs but has since been released."
+        ]
+      },
+      {
+        "name": "Transaction Scoping and Completion",
+        "result": "FAIL",
+        "evidence": [
+          "While the UE Context Release transaction completes successfully, the subsequent DOWNLINK NAS TRANSPORT message initiates a new implicit transaction for NAS message delivery. This transaction is not properly completed or terminated with an appropriate error notification (NAS NON DELIVERY INDICATION) when the UE context is unavailable. The state_machine shows a transition from 'DL_NAS_Transport_Discarded_Silently' to 'NAS_Non_Delivery_Ind_Sent' which is not taken in the bug scenario, indicating an incomplete transaction flow."
+        ]
+      },
+      {
+        "name": "Timer Preconditions / Implicit Acknowledgment",
+        "result": "FAIL",
+        "evidence": [
+          "The AMF sends a DOWNLINK NAS TRANSPORT message and implicitly expects either successful delivery or a notification of failure. The gNB-CU's silent discard means the AMF will not receive any explicit indication of the message's fate, leading to its internal timers for this NAS message potentially expiring without a clear cause from the gNB-CU, which is a violation of robust error handling."
+        ]
+      }
+    ],
+    "preliminary_verdict": "implementation-bug",
+    "rationale": "The gNB-CU's behavior of silently discarding the DOWNLINK NAS TRANSPORT message for a released UE context and failing to send a NAS NON DELIVERY INDICATION to the AMF constitutes an implementation bug. This violates the expected protocol behavior where the AMF should be explicitly informed of NAS message delivery failures, especially when the UE context is no longer available at the gNB-CU. The 'ngap_gNB_nas_non_delivery_ind' function in the provided code snippets indicates that such a mechanism exists and is intended to be used. The current implementation fails to invoke this mechanism in the described scenario, leading to a lack of notification for the AMF."
+  },
+  "step7": {
+    "evidence_pack": {
+      "spec_citations": [
+        "8.3.3 UE Context Release (gNB-CU initiated)",
+        "9.2.2.5 UE CONTEXT RELEASE COMMAND"
+      ],
+      "code_citations": [
+        "openair3/NGAP/ngap_gNB_nas_procedures.c ngap_gNB_handle_nas_downlink",
+        "openair3/NGAP/ngap_gNB_nas_procedures.c ngap_gNB_nas_non_delivery_ind",
+        "openair3/NGAP/ngap_gNB_ue_context.c ngap_get_ue_context",
+        "openair2/COMMON/ngap_messages_types.h ngap_nas_non_delivery_ind_t"
+      ],
+      "expected_vs_observed": "The expected behavior, as per NGAP procedures, is that upon receiving a DOWNLINK NAS TRANSPORT message for a UE context that has been released or is otherwise unknown, the gNB-CU should send a NAS NON DELIVERY INDICATION message back to the AMF. This notification is crucial for the AMF to be aware of the delivery failure and to manage its internal state and timers. However, the observed behavior is that the gNB-CU silently discards such messages without sending any notification to the AMF, leaving the AMF unaware of the delivery failure."
+    }
+  },
+  "step8": {
+    "report": {
+      "verdict": "spec-nonconformance",
+      "rationale": "The gNB-CU fails to adhere to NGAP procedures by silently discarding DOWNLINK NAS TRANSPORT messages for unknown or released UE contexts. Instead of sending a NAS NON DELIVERY INDICATION to the AMF, as required for proper error handling and state synchronization, the gNB-CU drops the message without notification. This violates the expected Req/Resp Pairing and Error Notification, and Transaction Scoping and Completion invariants, leaving the AMF unaware of the delivery failure and potentially leading to stale timers and inconsistent state.",
+      "citations": {
+        "spec": [
+          "8.3.3 UE Context Release (gNB-CU initiated)",
+          "9.2.2.5 UE CONTEXT RELEASE COMMAND"
+        ],
+        "code": [
+          "openair3/NGAP/ngap_gNB_nas_procedures.c ngap_gNB_handle_nas_downlink",
+          "openair3/NGAP/ngap_gNB_nas_procedures.c ngap_gNB_nas_non_delivery_ind",
+          "openair3/NGAP/ngap_gNB_ue_context.c ngap_get_ue_context",
+          "openair2/COMMON/ngap_messages_types.h ngap_nas_non_delivery_ind_t"
+        ]
+      },
+      "suggested_repro": [
+        "1. Establish a UE context between AMF and gNB-CU.",
+        "2. Initiate a UE Context Release procedure, ensuring the gNB-CU releases the UE context (e.g., gNB-CU initiated release).",
+        "3. After the UE context is released at the gNB-CU, the AMF sends a DOWNLINK NAS TRANSPORT message for the previously released UE context (using AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200).",
+        "4. Observe gNB-CU logs and network traces: The gNB-CU should silently discard the DOWNLINK NAS TRANSPORT message and fail to send a NAS NON DELIVERY INDICATION to the AMF."
+      ],
+      "risks": [
+        "AMF maintains an incorrect state regarding NAS message delivery, potentially leading to retransmissions or indefinite waiting.",
+        "User plane services or control plane procedures relying on NAS message delivery may be disrupted or delayed without the AMF being aware.",
+        "Increased signaling load due to AMF retransmissions or recovery attempts.",
+        "Difficulty in troubleshooting due to lack of explicit error notification from gNB-CU."
+      ],
+      "next_steps": [
+        "Implement the sending of NAS NON DELIVERY INDICATION from the gNB-CU to the AMF when a DOWNLINK NAS TRANSPORT message is received for an unknown or released UE context.",
+        "Verify the fix through unit and integration testing, ensuring the AMF receives the expected notification.",
+        "Review other error handling paths in the gNB-CU related to unknown UE contexts to ensure consistent behavior."
+      ]
+    }
+  }
+}

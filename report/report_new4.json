@@ -1,0 +1,478 @@
+{
+  "step1": {
+    "bug_card": {
+      "observed_behavior": "The OAI NG-RAN accepts UPLINK NAS TRANSPORT messages where the UE identity in the NAS PDU (SUPI-B) does not match the UE identity established in the UE context (SUPI-A), despite the NGAP IDs matching. This lack of validation could lead to a security bypass.",
+      "interface_guess": [
+        "NGAP"
+      ],
+      "procedure_guess": [
+        "UE Context Establishment",
+        "Uplink NAS Transport"
+      ],
+      "components_involved": [
+        "UE",
+        "AMF",
+        "gNB-CU"
+      ],
+      "key_ids": {
+        "transaction_id": "AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200"
+      },
+      "signals_or_timers": [
+        "UPLINK NAS TRANSPORT message"
+      ]
+    }
+  },
+  "step2": {
+    "candidate_spec_sections": [
+      {
+        "Keywords": [
+          "UE Context Establishment",
+          "UE context",
+          "UE identity",
+          "NGAP IDs",
+          "AMF-UE-NGAP-ID",
+          "RAN-UE-NGAP-ID"
+        ],
+        "title": [
+          "UE Context Establishment"
+        ]
+      },
+      {
+        "Keywords": [
+          "Successful Operation",
+          "UE CONTEXT SETUP REQUEST",
+          "UE context establishment",
+          "gNB-DU",
+          "Serving NID IE",
+          "Serving PLMN IE",
+          "UE identity"
+        ],
+        "title": [
+          "8.3.1.2 Successful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "Uplink NAS Transport",
+          "UPLINK NAS TRANSPORT message",
+          "NAS PDU",
+          "UE identity",
+          "security bypass"
+        ],
+        "title": [
+          "Uplink NAS Transport"
+        ]
+      }
+    ],
+    "expected_behaviour": "The NG-RAN (gNB) shall validate that the UE identity (SUPI) contained in the NAS PDU within an UPLINK NAS TRANSPORT message matches the UE identity established and stored in the UE context for the corresponding NGAP IDs. If a mismatch is detected, the message shall be rejected or handled as a security violation, preventing unauthorized access or security bypass."
+  },
+  "step3": {
+    "candidate_code": [
+      {
+        "path": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+        "function_name": "ngap_gNB_nas_uplink",
+        "reason": "Directly handles the UPLINK NAS TRANSPORT message. The bug states that UE identity validation is missing in this context."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+        "function_name": "ngap_gNB_handle_nas_first_req",
+        "reason": "Handles the Initial UE Message, which is part of UE Context Establishment and the first uplink NAS message, where initial UE identity is processed and stored."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_ue_context.c",
+        "function_name": "ngap_store_ue_context",
+        "reason": "Responsible for storing the UE context, including the established UE identity (SUPI-A), which needs to be compared against the identity in the NAS PDU."
+      },
+      {
+        "path": "openair3/NGAP/ngap_gNB_ue_context.c",
+        "function_name": "ngap_get_ue_context",
+        "reason": "Retrieves the UE context based on RAN-UE-NGAP-ID, which holds the established UE identity (SUPI-A)."
+      },
+      {
+        "path": "openair3/NAS/NR_UE/5GS/5GMM/IES/FGSMobileIdentity.c",
+        "function_name": "decode_5gs_mobile_identity",
+        "reason": "Parses the 5GS Mobile Identity (including SUPI-B) from the NAS PDU, which is the identity that needs to be validated."
+      },
+      {
+        "path": "openair3/NAS/COMMON/EMM/MSG/UplinkNasTransport.c",
+        "function_name": "decode_uplink_nas_transport",
+        "reason": "Entry point for decoding the NAS PDU carried within the UPLINK NAS TRANSPORT message. This function would call identity decoding functions."
+      },
+      {
+        "path": "openair2/COMMON/ngap_messages_types.h",
+        "function_name": "N/A",
+        "reason": "Defines the data structures for NGAP messages and UE identities (e.g., ngap_ue_identity_t, fiveg_s_tmsi_t), crucial for understanding the data flow."
+      }
+    ],
+    "control": {
+      "decision": "continue",
+      "fetch_requests": [
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_nas_procedures.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_ue_context.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NAS/NR_UE/5GS/5GMM/IES/FGSMobileIdentity.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NAS/COMMON/EMM/MSG/UplinkNasTransport.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair2/COMMON/ngap_messages_types.h",
+          "suffix": [
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_common.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_management_procedures.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_nnsf.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_decoder.c",
+          "suffix": [
+            "c",
+            "h"
+          ]
+        },
+        {
+          "pattern": "openair3/NGAP/ngap_gNB_encoder.h",
+          "suffix": [
+            "h"
+          ]
+        }
+      ]
+    }
+  },
+  "step4": {
+    "snippets": [
+      {
+        "kind": "spec",
+        "source": "UE Context Establishment involves setting up the necessary context for a UE within the network. This includes establishing the UE context, managing UE identity, and assigning NGAP IDs such as AMF-UE-NGAP-ID and RAN-UE-NGAP-ID for communication between the AMF and RAN.",
+        "location": "UE Context Establishment"
+      },
+      {
+        "kind": "spec",
+        "source": "Section 8.3.1.2 describes the successful operation of UE context establishment, specifically when a UE CONTEXT SETUP REQUEST is processed. This procedure involves the gNB-DU and includes information elements like Serving NID IE and Serving PLMN IE, crucial for establishing and validating the UE identity.",
+        "location": "8.3.1.2 Successful Operation"
+      },
+      {
+        "kind": "spec",
+        "source": "The Uplink NAS Transport procedure handles the UPLINK NAS TRANSPORT message, which carries a NAS PDU from the UE to the AMF. This message is critical for conveying NAS messages and often involves the UE identity. It may also be subject to security bypass mechanisms under certain conditions.",
+        "location": "Uplink NAS Transport"
+      },
+      {
+        "kind": "code",
+        "source": "The `ngap_gNB_nas_uplink` function in `ngap_gNB_nas_procedures.c` is responsible for processing the UPLINK NAS TRANSPORT message received from the UE. This function is a critical point where UE identity validation should occur, as the current implementation might be missing checks for the UE's identity within the NAS PDU.",
+        "location": "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_nas_uplink"
+      },
+      {
+        "kind": "code",
+        "source": "Function `ngap_gNB_handle_nas_first_req` in `ngap_gNB_nas_procedures.c` manages the Initial UE Message. This is a key part of the UE Context Establishment process, as it's the first uplink NAS message where the initial UE identity is processed, validated, and subsequently stored for future reference.",
+        "location": "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_handle_nas_first_req"
+      },
+      {
+        "kind": "code",
+        "source": "The `ngap_store_ue_context` function in `ngap_gNB_ue_context.c` is crucial for persisting the UE context. This includes storing the established UE identity, such as SUPI-A. This stored identity is vital for subsequent validation, where it must be compared against the identity presented in incoming NAS PDUs to ensure authenticity.",
+        "location": "openair3/NGAP/ngap_gNB_ue_context.c:ngap_store_ue_context"
+      },
+      {
+        "kind": "code",
+        "source": "Function `ngap_get_ue_context` in `ngap_gNB_ue_context.c` is used to retrieve the UE context. It typically uses the RAN-UE-NGAP-ID as a key to access the stored context, which contains the established UE identity (e.g., SUPI-A). This retrieved identity is essential for validating subsequent NAS messages.",
+        "location": "openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context"
+      },
+      {
+        "kind": "code",
+        "source": "The `decode_5gs_mobile_identity` function in `FGSMobileIdentity.c` is responsible for parsing the 5GS Mobile Identity from a NAS PDU. This identity, which can include SUPI-B, is the specific piece of information that requires validation against the established UE context to ensure the legitimacy of the UE.",
+        "location": "openair3/NAS/NR_UE/5GS/5GMM/IES/FGSMobileIdentity.c:decode_5gs_mobile_identity"
+      },
+      {
+        "kind": "code",
+        "source": "Function `decode_uplink_nas_transport` in `UplinkNasTransport.c` serves as the primary entry point for decoding the NAS PDU embedded within an UPLINK NAS TRANSPORT message. This function orchestrates the parsing process and would typically invoke other specialized functions, such as those for decoding UE identities, to extract relevant information.",
+        "location": "openair3/NAS/COMMON/EMM/MSG/UplinkNasTransport.c:decode_uplink_nas_transport"
+      },
+      {
+        "kind": "code",
+        "source": "The header file `ngap_messages_types.h` in `openair2/COMMON/` defines essential data structures for NGAP messages and UE identities. This includes types like `ngap_ue_identity_t` and `fiveg_s_tmsi_t`, which are fundamental for representing and handling UE identities throughout the NGAP protocol stack, providing insight into the data flow.",
+        "location": "openair2/COMMON/ngap_messages_types.h"
+      }
+    ]
+  },
+  "step5": {
+    "sequence_diagram": [
+      {
+        "from": "UE",
+        "to": "gNB-CU",
+        "message": "Initial UE Message (NAS PDU with SUPI-A)",
+        "precond": "UE is powered on and initiating network access.",
+        "postcond": "gNB-CU receives the initial NAS PDU containing SUPI-A."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "AMF",
+        "message": "Initial UE Message (NAS PDU with SUPI-A, RAN-UE-NGAP-ID)",
+        "precond": "gNB-CU received Initial UE Message from UE.",
+        "postcond": "AMF receives initial NAS PDU; gNB-CU assigns RAN-UE-NGAP-ID."
+      },
+      {
+        "from": "AMF",
+        "to": "gNB-CU",
+        "message": "UE CONTEXT SETUP REQUEST (AMF-UE-NGAP-ID, SUPI-A)",
+        "precond": "AMF processed Initial UE Message and decided to establish UE context.",
+        "postcond": "gNB-CU receives request to set up UE context with assigned AMF-UE-NGAP-ID and SUPI-A."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Store UE Context (SUPI-A, AMF-UE-NGAP-ID, RAN-UE-NGAP-ID)",
+        "precond": "gNB-CU received UE CONTEXT SETUP REQUEST.",
+        "postcond": "UE context, including SUPI-A, is stored in gNB-CU, associated with NGAP IDs."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "AMF",
+        "message": "UE CONTEXT SETUP RESPONSE",
+        "precond": "UE context successfully stored in gNB-CU.",
+        "postcond": "AMF acknowledges UE context setup completion."
+      },
+      {
+        "from": "UE",
+        "to": "gNB-CU",
+        "message": "UPLINK NAS TRANSPORT (NAS PDU with SUPI-B)",
+        "precond": "UE context established; UE wants to send a subsequent NAS message.",
+        "postcond": "gNB-CU receives UPLINK NAS TRANSPORT message."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Retrieve UE Context (using RAN-UE-NGAP-ID)",
+        "precond": "gNB-CU received UPLINK NAS TRANSPORT message.",
+        "postcond": "gNB-CU retrieves the stored UE context, including SUPI-A."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Decode NAS PDU and extract SUPI-B",
+        "precond": "gNB-CU retrieved UE context.",
+        "postcond": "SUPI-B is extracted from the NAS PDU within the UPLINK NAS TRANSPORT message."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "gNB-CU",
+        "message": "Validate SUPI-B against SUPI-A (BUG: Validation missing/fails)",
+        "precond": "Stored SUPI-A and extracted SUPI-B are available.",
+        "postcond": "gNB-CU incorrectly proceeds as if validation passed, even if SUPI-B != SUPI-A."
+      },
+      {
+        "from": "gNB-CU",
+        "to": "AMF",
+        "message": "UPLINK NAS TRANSPORT (NAS PDU with SUPI-B)",
+        "precond": "gNB-CU processed UPLINK NAS TRANSPORT, failed to validate SUPI-B.",
+        "postcond": "AMF receives UPLINK NAS TRANSPORT with potentially spoofed SUPI-B."
+      }
+    ],
+    "state_machine": {
+      "states": [
+        "Idle",
+        "UE Context Setup Pending",
+        "UE Context Established",
+        "Uplink NAS Received",
+        "NAS Identity Processed",
+        "NAS Forwarded"
+      ],
+      "transitions": [
+        {
+          "from": "Idle",
+          "to": "UE Context Setup Pending",
+          "on": "Initial UE Message received"
+        },
+        {
+          "from": "UE Context Setup Pending",
+          "to": "UE Context Established",
+          "on": "UE Context stored (SUPI-A)"
+        },
+        {
+          "from": "UE Context Established",
+          "to": "Uplink NAS Received",
+          "on": "UPLINK NAS TRANSPORT message received"
+        },
+        {
+          "from": "Uplink NAS Received",
+          "to": "NAS Identity Processed",
+          "on": "NAS PDU decoded and SUPI-B extracted"
+        },
+        {
+          "from": "NAS Identity Processed",
+          "to": "NAS Forwarded",
+          "on": "Identity Check (BUG: always passes)",
+          "guard": "SUPI-B may or may not match SUPI-A"
+        },
+        {
+          "from": "NAS Forwarded",
+          "to": "UE Context Established",
+          "on": "UPLINK NAS TRANSPORT sent to AMF"
+        }
+      ]
+    },
+    "assumptions": [
+      "The Initial UE Message correctly establishes and stores SUPI-A in the gNB-CU's UE context.",
+      "The UPLINK NAS TRANSPORT message contains a NAS PDU from which SUPI-B can be extracted.",
+      "The NGAP IDs (AMF-UE-NGAP-ID, RAN-UE-NGAP-ID) are correctly used to retrieve the UE context in the gNB-CU.",
+      "The bug is specifically the gNB-CU's failure to validate SUPI-B against the stored SUPI-A during UPLINK NAS TRANSPORT processing.",
+      "SUPI-A refers to the UE identity established during UE Context Establishment and stored in the gNB-CU.",
+      "SUPI-B refers to the UE identity present in the NAS PDU carried by the UPLINK NAS TRANSPORT message."
+    ],
+    "questions": [
+      "What is the expected error handling or rejection mechanism when SUPI-B does not match SUPI-A?",
+      "Is there any other identity validation performed by the gNB-CU for subsequent NAS messages, or is this the only point of failure?",
+      "Does the AMF perform its own validation of the NAS PDU identity against its stored context, potentially mitigating this gNB-CU bug?",
+      "Are there specific security implications beyond a general 'security bypass' that need to be detailed?",
+      "Is the `decode_5gs_mobile_identity` function always invoked for all UPLINK NAS TRANSPORT messages, or only for specific NAS message types within the PDU?"
+    ]
+  },
+  "step6": {
+    "invariant_checks": [
+      {
+        "name": "Directionality",
+        "result": "PASS",
+        "evidence": [
+          "sequence_diagram:UE to gNB-CU: Initial UE Message",
+          "sequence_diagram:gNB-CU to AMF: Initial UE Message",
+          "sequence_diagram:AMF to gNB-CU: UE CONTEXT SETUP REQUEST",
+          "sequence_diagram:gNB-CU to AMF: UE CONTEXT SETUP RESPONSE",
+          "sequence_diagram:UE to gNB-CU: UPLINK NAS TRANSPORT",
+          "sequence_diagram:gNB-CU to AMF: UPLINK NAS TRANSPORT"
+        ]
+      },
+      {
+        "name": "Req/Resp pairing",
+        "result": "PASS",
+        "evidence": [
+          "sequence_diagram:AMF to gNB-CU: UE CONTEXT SETUP REQUEST",
+          "sequence_diagram:gNB-CU to AMF: UE CONTEXT SETUP RESPONSE"
+        ]
+      },
+      {
+        "name": "ID binding",
+        "result": "FAIL",
+        "evidence": [
+          "bug_card:The OAI NG-RAN accepts UPLINK NAS TRANSPORT messages where the UE identity in the NAS PDU (SUPI-B) does not match the UE identity established in the UE context (SUPI-A)",
+          "sequence_diagram:Validate SUPI-B against SUPI-A (BUG: Validation missing/fails)",
+          "state_machine:Identity Check (BUG: always passes)",
+          "snippets:openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_nas_uplink (critical point where UE identity validation should occur)",
+          "snippets:openair3/NGAP/ngap_gNB_ue_context.c:ngap_store_ue_context (stores SUPI-A in UE context)",
+          "snippets:openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context (retrieves SUPI-A using RAN-UE-NGAP-ID)",
+          "snippets:openair3/NAS/NR_UE/5GS/5GMM/IES/FGSMobileIdentity.c:decode_5gs_mobile_identity (decodes SUPI-B from NAS PDU)"
+        ]
+      },
+      {
+        "name": "Transaction scoping",
+        "result": "PASS",
+        "evidence": [
+          "bug_card:key_ids: AMF-UE-NGAP-ID=100, RAN-UE-NGAP-ID=200",
+          "sequence_diagram:Store UE Context (SUPI-A, AMF-UE-NGAP-ID, RAN-UE-NGAP-ID)",
+          "sequence_diagram:Retrieve UE Context (using RAN-UE-NGAP-ID)",
+          "snippets:openair3/NGAP/ngap_gNB_ue_context.c:ngap_store_ue_context",
+          "snippets:openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context"
+        ]
+      },
+      {
+        "name": "No-pending-request on new request",
+        "result": "UNKNOWN",
+        "evidence": []
+      },
+      {
+        "name": "Timer preconditions",
+        "result": "UNKNOWN",
+        "evidence": []
+      }
+    ],
+    "preliminary_verdict": "implementation-bug",
+    "rationale": "The OAI NG-RAN implementation exhibits a critical security vulnerability by failing to validate the UE identity within an UPLINK NAS TRANSPORT message against the established UE context. Although the gNB-CU correctly retrieves the UE context using the NGAP IDs, it does not perform the necessary check to ensure that the SUPI (SUPI-B) presented in the incoming NAS PDU matches the SUPI (SUPI-A) stored during UE context establishment. This omission, explicitly identified as a bug in the sequence diagram and state machine, constitutes an implementation flaw that could lead to a security bypass, allowing a malicious UE to potentially spoof its identity for subsequent NAS messages. The relevant code snippets highlight the functions involved in processing and storing UE identities, indicating that the validation logic is either missing or incorrectly implemented within the `ngap_gNB_nas_uplink` function."
+  },
+  "step7": {
+    "evidence_pack": {
+      "spec_citations": [
+        "UE Context Establishment",
+        "8.3.1.2 Successful Operation",
+        "Uplink NAS Transport"
+      ],
+      "code_citations": [
+        "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_nas_uplink",
+        "openair3/NGAP/ngap_gNB_ue_context.c:ngap_store_ue_context",
+        "openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context",
+        "openair3/NAS/NR_UE/5GS/5GMM/IES/FGSMobileIdentity.c:decode_5gs_mobile_identity",
+        "openair3/NAS/COMMON/EMM/MSG/UplinkNasTransport.c:decode_uplink_nas_transport"
+      ],
+      "expected_vs_observed": "The 3GPP specifications imply that during UE Context Establishment and Uplink NAS Transport, the network should establish and validate the UE's identity to ensure secure communication. Specifically, when an UPLINK NAS TRANSPORT message is received, the UE identity (SUPI-B) within the NAS PDU is expected to be validated against the UE identity (SUPI-A) stored in the established UE context, even if NGAP IDs match. However, the observed behavior in the OAI NG-RAN is that it accepts UPLINK NAS TRANSPORT messages where the SUPI-B in the NAS PDU does not match the SUPI-A in the UE context, leading to a security bypass due to missing or failed identity validation."
+    }
+  },
+  "step8": {
+    "report": {
+      "verdict": "implementation-bug",
+      "rationale": "The OAI NG-RAN implementation fails to validate the UE identity (SUPI-B) within the NAS PDU of an UPLINK NAS TRANSPORT message against the established UE identity (SUPI-A) in the UE context. This allows a mismatch, as confirmed by the 'ID binding' invariant check failure, leading to a security bypass.",
+      "citations": {
+        "spec": [
+          "UE Context Establishment",
+          "8.3.1.2 Successful Operation",
+          "Uplink NAS Transport"
+        ],
+        "code": [
+          "openair3/NGAP/ngap_gNB_nas_procedures.c:ngap_gNB_nas_uplink",
+          "openair3/NGAP/ngap_gNB_ue_context.c:ngap_store_ue_context",
+          "openair3/NGAP/ngap_gNB_ue_context.c:ngap_get_ue_context",
+          "openair3/NAS/NR_UE/5GS/5GMM/IES/FGSMobileIdentity.c:decode_5gs_mobile_identity",
+          "openair3/NAS/COMMON/EMM/MSG/UplinkNasTransport.c:decode_uplink_nas_transport"
+        ]
+      },
+      "suggested_repro": [
+        "1. Establish a UE context for a UE with SUPI-A.",
+        "2. Send an UPLINK NAS TRANSPORT message from the UE, where the NAS PDU contains a different UE identity (SUPI-B).",
+        "3. Observe that the OAI NG-RAN accepts and processes the message despite the SUPI mismatch."
+      ],
+      "risks": [
+        "Security bypass: An attacker could potentially impersonate a legitimate UE or inject unauthorized NAS messages by exploiting the lack of identity validation.",
+        "Compromised network integrity: Unauthorized access to network resources or services."
+      ],
+      "next_steps": [
+        "Implement robust validation logic in `ngap_gNB_nas_uplink` to compare SUPI-B from the NAS PDU with SUPI-A from the UE context.",
+        "Ensure proper error handling and rejection of UPLINK NAS TRANSPORT messages with mismatched UE identities.",
+        "Conduct security testing to verify the effectiveness of the implemented fix."
+      ]
+    }
+  }
+}

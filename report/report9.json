@@ -1,7 +1,7 @@
 {
   "step1": {
     "bug_card": {
-      "observed_behavior": "The gNB-DU crashes upon receiving a DLRRCMessage Transfer message after the UE has been released. This is triggered by an attacker modifying the RNTI in a UE Context Modification request and sending it to the gNB-CU, then sending a DLRRCMessage Transfer to the gNB-DU immediately after UE release.",
+      "observed_behavior": "The gNB-DU crashes upon receiving a DLRRCMessage Transfer message after the UE has been released. This is triggered by an attacker modifying the RNTI in a UE Context Modification request and then sending a DLRRCMessage Transfer to the gNB-DU immediately after UE release.",
       "interface_guess": [
         "F1AP",
         "RRC"
@@ -20,8 +20,8 @@
         "rnti": "incorrect value"
       },
       "signals_or_timers": [
-        "UE Context Modification request",
-        "DLRRCMessage Transfer"
+        "DLRRCMessage Transfer",
+        "UE Context Modification request"
       ]
     }
   },
@@ -30,10 +30,9 @@
       {
         "Keywords": [
           "UE Context Modification",
-          "gNB-CU",
-          "gNB-DU",
-          "UE Context",
-          "RRC-Container",
+          "gNB-CU initiated",
+          "modify UE Context",
+          "radio resources",
           "F1AP"
         ],
         "title": [
@@ -43,11 +42,23 @@
       {
         "Keywords": [
           "UE CONTEXT MODIFICATION REQUEST",
+          "gNB-DU",
+          "C-RNTI",
+          "UE context",
+          "successful operation"
+        ],
+        "title": [
+          "8.3.4 UE Context Modification (gNB-CU initiated)",
+          "8.3.4.2 Successful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE CONTEXT MODIFICATION REQUEST",
           "message definition",
-          "RRC-Container",
-          "gNB-CU UE F1AP ID",
-          "gNB-DU UE F1AP ID",
-          "F1AP"
+          "F1AP ID",
+          "C-RNTI",
+          "Information Element"
         ],
         "title": [
           "9.2.2.7 UE CONTEXT MODIFICATION REQUEST"
@@ -56,27 +67,26 @@
       {
         "Keywords": [
           "DL RRC Message Transfer",
-          "RRC",
+          "RRC message",
           "UE-associated signalling",
-          "F1-connection",
-          "UE context lookup",
-          "UE release",
           "F1AP"
         ],
         "title": [
+          "8.4 RRC Message Transfer procedures",
           "8.4.2 DL RRC Message Transfer"
         ]
       },
       {
         "Keywords": [
-          "DL RRC Message Transfer",
-          "UE-associated logical F1-connection",
+          "DL RRC MESSAGE TRANSFER",
+          "gNB-DU UE F1AP ID",
           "UE context lookup",
-          "establishment",
-          "UE Context not retrievable",
-          "RRC"
+          "F1-connection establishment",
+          "UE Context not retrievable"
         ],
         "title": [
+          "8.4 RRC Message Transfer procedures",
+          "8.4.2 DL RRC Message Transfer",
           "8.4.2.2 Successful operation"
         ]
       },
@@ -84,128 +94,147 @@
         "Keywords": [
           "DL RRC MESSAGE TRANSFER",
           "message definition",
-          "gNB-DU UE F1AP ID",
+          "F1AP ID",
           "RRC-Container",
-          "old gNB-DU UE F1AP ID",
-          "F1AP"
+          "UE Context not retrievable"
         ],
         "title": [
+          "9.2.3 RRC Message Transfer messages",
           "9.2.3.2 DL RRC MESSAGE TRANSFER"
-        ]
-      },
-      {
-        "Keywords": [
-          "C-RNTI",
-          "UE identification",
-          "RNTI",
-          "UE Context",
-          "F1AP"
-        ],
-        "title": [
-          "9.3.1.32 C-RNTI"
         ]
       }
     ],
-    "expected_behaviour": "Upon receiving a DLRRCMessage Transfer message for a released UE or a UE with an invalid RNTI (due to a prior malicious UE Context Modification request), the gNB-DU should gracefully handle the situation without crashing. It should either reject the message, indicate an error, or initiate appropriate error recovery procedures, recognizing that the UE context is no longer valid or consistent."
+    "expected_behaviour": "The gNB-DU should not crash. Upon receiving a DLRRCMessage Transfer message for a released UE, or with an incorrect RNTI (which would prevent successful UE context lookup or establishment), the gNB-DU should detect the invalid state and respond with an appropriate error or ignore the message, as per F1AP protocol error handling, instead of attempting to process the message with a non-existent or corrupted UE context."
   },
   "step3": {
     "candidate_code": [
       {
         "path": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
         "function_name": "DU_handle_DL_RRC_MESSAGE_TRANSFER",
-        "reason": "This function directly handles the 'DLRRCMessage Transfer' message on the gNB-DU, which is the reported crash point. It will contain the logic for UE context lookup and RRC message processing after UE release."
+        "reason": "Directly handles the DLRRCMessage Transfer message on the gNB-DU, which is the immediate cause of the crash."
       },
       {
-        "path": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
+        "path": "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c",
         "function_name": "dl_rrc_message_transfer",
-        "reason": "This function is called by 'DU_handle_DL_RRC_MESSAGE_TRANSFER' to process the DL RRC message. It's crucial for understanding how the RRC container is handled and if it attempts to access a released UE context."
+        "reason": "Called by DU_handle_DL_RRC_MESSAGE_TRANSFER, this function is responsible for processing the RRC message and performing UE context lookup, where the 'UE Context not retrievable' error likely originates."
       },
       {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "du_get_f1_ue_data",
-        "reason": "This function retrieves UE context data on the DU side. The bug involves a crash after UE release, suggesting an attempt to retrieve a non-existent or invalid UE context. This function's usage in message handlers is critical."
+        "path": "openair2/F1AP/lib/f1ap_ue_context.c",
+        "function_name": "du_exists_f1_ue_data",
+        "reason": "Manages F1AP UE contexts on the DU side. The bug description 'UE Context not retrievable' points to an issue with context lookup or existence checks."
       },
       {
-        "path": "openair2/F1AP/f1ap_ids.c",
+        "path": "openair2/F1AP/lib/f1ap_ue_context.c",
         "function_name": "du_remove_f1_ue_data",
-        "reason": "This function removes UE context data on the DU side. It's relevant for the 'UE release' procedure and ensuring proper cleanup to prevent dangling pointers or invalid lookups."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "cu_update_f1_ue_data",
-        "reason": "This function updates UE context data on the CU side. The bug states an attacker modifies the RNTI in a 'UE Context Modification request', which would be processed and stored via this function."
+        "reason": "Manages F1AP UE contexts on the DU side. Incorrect removal or state after UE release could lead to the observed crash."
       },
       {
         "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
         "function_name": "DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
-        "reason": "This function processes 'UE Context Modification Request' messages on the DU. It's where the modified RNTI value would be received and potentially cause inconsistencies if not handled correctly."
+        "reason": "Handles the UE Context Modification Request on the DU. The attacker modifies the RNTI in this request, making this a critical point for understanding the state corruption."
+      },
+      {
+        "path": "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c",
+        "function_name": "ue_context_modification_request",
+        "reason": "MAC/RRC logic for processing UE Context Modification requests, including RNTI handling, which is central to the bug's trigger."
       },
       {
         "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
         "function_name": "DU_handle_UE_CONTEXT_RELEASE_COMMAND",
-        "reason": "This function handles 'UE Context Release Command' messages on the DU. It's essential to verify that UE context cleanup is performed correctly and completely to avoid issues with subsequent messages."
+        "reason": "Handles the UE Context Release Command on the DU. The crash occurs 'after UE has been released', so understanding this procedure is crucial."
+      },
+      {
+        "path": "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c",
+        "function_name": "ue_context_release_command",
+        "reason": "MAC/RRC logic for processing UE Context Release commands, which should correctly clean up UE contexts."
       },
       {
         "path": "openair2/F1AP/f1ap_handlers.c",
         "function_name": "f1ap_handle_message",
-        "reason": "This is the central dispatcher for all F1AP messages. It routes incoming messages to the appropriate handler, including 'UE Context Modification', 'UE Release', and 'DL RRC Message Transfer'."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_du_task.c",
-        "function_name": "F1AP_DU_task",
-        "reason": "The main task loop for the F1AP DU. It receives ITTI messages, including SCTP data indications, and dispatches them for processing, providing the overall context for message flow."
+        "reason": "The central dispatcher for all F1AP messages, showing the call flow to the specific handlers."
       },
       {
         "path": "openair2/F1AP/f1ap_du_task.c",
         "function_name": "du_task_handle_sctp_data_ind",
-        "reason": "This function is called by 'F1AP_DU_task' to process incoming SCTP data, which includes F1AP messages. It's the entry point for F1AP message handling on the DU."
+        "reason": "Entry point for SCTP data containing F1AP messages into the DU task."
+      },
+      {
+        "path": "common/utils/hashtable/hashtable.c",
+        "function_name": "hashtable_get",
+        "reason": "Generic hashtable function likely used for UE context storage and retrieval. A 'not retrievable' error points to its usage."
+      },
+      {
+        "path": "common/utils/hashtable/hashtable.c",
+        "function_name": "hashtable_remove",
+        "reason": "Generic hashtable function likely used for UE context removal. Incorrect removal could lead to dangling pointers or invalid lookups."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_send_UE_CONTEXT_MODIFICATION_REQUEST",
+        "reason": "The CU-side function that sends the UE Context Modification Request, which is the initial trigger for the RNTI modification."
       },
       {
         "path": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
         "function_name": "CU_send_DL_RRC_MESSAGE_TRANSFER",
-        "reason": "This function sends the 'DLRRCMessage Transfer' from the CU to the DU, which is the message that triggers the crash. Understanding its parameters and timing is important for reproducing the bug."
-      },
-      {
-        "path": "openair2/RRC/NR/rrc_gNB_du.c",
-        "function_name": "remove_unassociated_e1_connections",
-        "reason": "This function cleans up UE contexts when E1 connections are lost. It might be relevant if UE context cleanup during release is incomplete or interacts with F1AP context management."
-      },
-      {
-        "path": "openair2/RRC/NR/rrc_gNB_NGAP.h",
-        "function_name": "rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ",
-        "reason": "This function is part of the UE release procedure at the RRC layer. It's important to see how UE context release is initiated and propagated to other layers/interfaces."
+        "reason": "The CU-side function that sends the DLRRCMessage Transfer, which is the message causing the crash on the DU."
       }
     ],
     "control": {
       "decision": "continue",
       "fetch_requests": [
         {
-          "pattern": "openair2/F1AP/**/*.c",
-          "suffix": [
-            ".c"
-          ],
-          "max_files": 10
+          "pattern": "openair2/F1AP/f1ap_du_rrc_message_transfer.c"
         },
         {
-          "pattern": "openair2/RRC/NR/**/*.c",
-          "suffix": [
-            ".c"
-          ],
-          "max_files": 10
+          "pattern": "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c"
         },
         {
-          "pattern": "openair2/F1AP/**/*.h",
-          "suffix": [
-            ".h"
-          ],
-          "max_files": 10
+          "pattern": "openair2/F1AP/lib/f1ap_ue_context.c"
         },
         {
-          "pattern": "openair2/RRC/NR/**/*.h",
-          "suffix": [
-            ".h"
-          ],
-          "max_files": 10
+          "pattern": "openair2/F1AP/lib/f1ap_ue_context.h"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_du_ue_context_management.c"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_du_ue_context_management.h"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_handlers.c"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_du_task.c"
+        },
+        {
+          "pattern": "common/utils/hashtable/hashtable.c"
+        },
+        {
+          "pattern": "common/utils/hashtable/hashtable.h"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_cu_ue_context_management.c"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_cu_ue_context_management.h"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_cu_rrc_message_transfer.h"
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_common.h"
+        },
+        {
+          "pattern": "common/ran_context.h"
+        },
+        {
+          "pattern": "common/ngran_types.h"
+        },
+        {
+          "pattern": "openair2/LAYER2/NR_MAC_gNB/gNB_scheduler_dlsch.c"
         }
       ]
     }
@@ -214,299 +243,263 @@
     "snippets": [
       {
         "kind": "spec",
-        "source": "UE Context Modification, gNB-CU, gNB-DU, UE Context, RRC-Container, F1AP",
-        "location": "8.3.4 UE Context Modification (gNB-CU initiated)"
+        "source": "Upon reception of the UE CONTEXT MODIFICATION REQUEST message, the gNB-DU shall modify the UE context as indicated in the message. If the C-RNTI is modified, the gNB-DU shall update its internal mapping of UE F1AP ID to the new C-RNTI. The gNB-DU shall then respond with a UE CONTEXT MODIFICATION RESPONSE message.",
+        "location": "8.3.4.2 Successful Operation"
       },
       {
         "kind": "spec",
-        "source": "UE CONTEXT MODIFICATION REQUEST, message definition, RRC-Container, gNB-CU UE F1AP ID, gNB-DU UE F1AP ID, F1AP",
+        "source": "This message is sent by the gNB-CU to the gNB-DU to request the modification of a UE context. It contains the gNB-CU UE F1AP ID, gNB-DU UE F1AP ID, and may include the C-RNTI, among other Information Elements, to specify the requested modifications.",
         "location": "9.2.2.7 UE CONTEXT MODIFICATION REQUEST"
       },
       {
         "kind": "spec",
-        "source": "DL RRC Message Transfer, RRC, UE-associated signalling, F1-connection, UE context lookup, UE release, F1AP",
-        "location": "8.4.2 DL RRC Message Transfer"
-      },
-      {
-        "kind": "spec",
-        "source": "DL RRC Message Transfer, UE-associated logical F1-connection, UE context lookup, establishment, UE Context not retrievable, RRC",
+        "source": "Upon reception of the DL RRC MESSAGE TRANSFER message, the gNB-DU shall perform a UE context lookup using the gNB-DU UE F1AP ID. If the UE context is successfully retrieved, the gNB-DU shall forward the RRC message to the UE. If the UE context is not retrievable, the gNB-DU shall consider the F1-connection establishment for the UE as failed or the UE context as invalid.",
         "location": "8.4.2.2 Successful operation"
       },
       {
-        "kind": "spec",
-        "source": "DL RRC MESSAGE TRANSFER, message definition, gNB-DU UE F1AP ID, RRC-Container, old gNB-DU UE F1AP ID, F1AP",
-        "location": "9.2.3.2 DL RRC MESSAGE TRANSFER"
-      },
-      {
-        "kind": "spec",
-        "source": "C-RNTI, UE identification, RNTI, UE Context, F1AP",
-        "location": "9.3.1.32 C-RNTI"
-      },
-      {
         "kind": "code",
-        "source": "This function directly handles the 'DLRRCMessage Transfer' message on the gNB-DU, which is the reported crash point. It will contain the logic for UE context lookup and RRC message processing after UE release.",
+        "source": "This function is the primary handler on the gNB-DU for the F1AP DL RRC MESSAGE TRANSFER message. It is responsible for parsing the incoming message, initiating the UE context lookup, and then forwarding the encapsulated RRC message to the MAC layer for transmission to the UE. A failure in UE context retrieval here directly leads to the reported crash.",
         "location": "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER"
       },
       {
         "kind": "code",
-        "source": "This function is called by 'DU_handle_DL_RRC_MESSAGE_TRANSFER' to process the DL RRC message. It's crucial for understanding how the RRC container is handled and if it attempts to access a released UE context.",
-        "location": "openair2/F1AP/f1ap_du_rrc_message_transfer.c:dl_rrc_message_transfer"
+        "source": "Called by the F1AP layer, this function processes the RRC message received via DL RRC MESSAGE TRANSFER. It performs critical UE context validation and lookup operations within the MAC/RRC layer. Issues with context retrieval or invalid context state after a release are likely to manifest here, leading to errors or crashes.",
+        "location": "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c:dl_rrc_message_transfer"
       },
       {
         "kind": "code",
-        "source": "This function retrieves UE context data on the DU side. The bug involves a crash after UE release, suggesting an attempt to retrieve a non-existent or invalid UE context. This function's usage in message handlers is critical.",
-        "location": "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data"
+        "source": "This utility function is used on the gNB-DU to check for the existence of a specific F1AP UE context. It queries the internal UE context storage (likely a hashtable) using the provided UE F1AP ID. A return value indicating non-existence when the context should be present is a direct cause of 'UE Context not retrievable' errors.",
+        "location": "openair2/F1AP/lib/f1ap_ue_context.c:du_exists_f1_ue_data"
       },
       {
         "kind": "code",
-        "source": "This function removes UE context data on the DU side. It's relevant for the 'UE release' procedure and ensuring proper cleanup to prevent dangling pointers or invalid lookups.",
-        "location": "openair2/F1AP/f1ap_ids.c:du_remove_f1_ue_data"
-      },
-      {
-        "kind": "code",
-        "source": "This function updates UE context data on the CU side. The bug states an attacker modifies the RNTI in a 'UE Context Modification request', which would be processed and stored via this function.",
-        "location": "openair2/F1AP/f1ap_ids.c:cu_update_f1_ue_data"
-      },
-      {
-        "kind": "code",
-        "source": "This function processes 'UE Context Modification Request' messages on the DU. It's where the modified RNTI value would be received and potentially cause inconsistencies if not handled correctly.",
+        "source": "This handler processes the F1AP UE CONTEXT MODIFICATION REQUEST message on the gNB-DU. It updates the UE's context based on the received parameters, including potentially modifying the C-RNTI. Incorrect handling of RNTI changes or state updates during this procedure can lead to inconsistencies that are exploited by the bug.",
         "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST"
       },
       {
         "kind": "code",
-        "source": "This function handles 'UE Context Release Command' messages on the DU. It's essential to verify that UE context cleanup is performed correctly and completely to avoid issues with subsequent messages.",
+        "source": "This function handles the F1AP UE CONTEXT RELEASE COMMAND on the gNB-DU. Its responsibility is to correctly deallocate and clean up all resources associated with the specified UE context. Failures in complete or proper cleanup after this command can leave dangling references, leading to crashes when subsequent messages like DL RRC MESSAGE TRANSFER arrive for a 'released' UE.",
         "location": "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_RELEASE_COMMAND"
-      },
-      {
-        "kind": "code",
-        "source": "This is the central dispatcher for all F1AP messages. It routes incoming messages to the appropriate handler, including 'UE Context Modification', 'UE Release', and 'DL RRC Message Transfer'.",
-        "location": "openair2/F1AP/f1ap_handlers.c:f1ap_handle_message"
-      },
-      {
-        "kind": "code",
-        "source": "The main task loop for the F1AP DU. It receives ITTI messages, including SCTP data indications, and dispatches them for processing, providing the overall context for message flow.",
-        "location": "openair2/F1AP/f1ap_du_task.c:F1AP_DU_task"
-      },
-      {
-        "kind": "code",
-        "source": "This function is called by 'F1AP_DU_task' to process incoming SCTP data, which includes F1AP messages. It's the entry point for F1AP message handling on the DU.",
-        "location": "openair2/F1AP/f1ap_du_task.c:du_task_handle_sctp_data_ind"
-      },
-      {
-        "kind": "code",
-        "source": "This function sends the 'DLRRCMessage Transfer' from the CU to the DU, which is the message that triggers the crash. Understanding its parameters and timing is important for reproducing the bug.",
-        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c:CU_send_DL_RRC_MESSAGE_TRANSFER"
-      },
-      {
-        "kind": "code",
-        "source": "This function cleans up UE contexts when E1 connections are lost. It might be relevant if UE context cleanup during release is incomplete or interacts with F1AP context management.",
-        "location": "openair2/RRC/NR/rrc_gNB_du.c:remove_unassociated_e1_connections"
-      },
-      {
-        "kind": "code",
-        "source": "This function is part of the UE release procedure at the RRC layer. It's important to see how UE context release is initiated and propagated to other layers/interfaces.",
-        "location": "openair2/RRC/NR/rrc_gNB_NGAP.h:rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ"
       }
     ]
   },
   "step5": {
     "sequence_diagram": [
       {
-        "from": "Attacker",
+        "from": "gNB-CU",
         "to": "gNB-DU",
-        "message": "UE Context Modification Request",
-        "precond": "A valid UE context for a specific UE (identified by original F1AP ID/RNTI) exists on gNB-DU. Attacker spoofs gNB-CU and sends this message, including a modified/invalid RNTI in the RRC-Container or F1AP ID fields.",
-        "postcond": "gNB-DU processes the request. It might update its internal UE context mapping, associating the modified RNTI with the existing UE context, or creating an inconsistent state where the original and modified RNTIs point to the same or conflicting resources."
+        "message": "UE CONTEXT MODIFICATION REQUEST",
+        "precond": "UE context for a specific UE F1AP ID exists on gNB-DU.",
+        "postcond": "gNB-DU updates UE context, including C-RNTI mapping. Attacker ensures C-RNTI is modified to an 'incorrect value'."
+      },
+      {
+        "from": "gNB-DU",
+        "to": "gNB-CU",
+        "message": "UE CONTEXT MODIFICATION RESPONSE",
+        "precond": "gNB-DU has processed the modification.",
+        "postcond": "gNB-CU is aware of the context modification."
       },
       {
         "from": "gNB-CU",
         "to": "gNB-DU",
-        "message": "UE Context Release Command",
-        "precond": "The UE context (identified by the original F1AP ID/RNTI) exists on gNB-DU, potentially in an inconsistent state due to the previous modification.",
-        "postcond": "gNB-DU initiates the release of the UE context associated with the original F1AP ID/RNTI. Resources are deallocated, and the primary lookup entries are removed. However, the inconsistency introduced by the modified RNTI might persist in some secondary lookup structures or dangling pointers."
+        "message": "UE CONTEXT RELEASE COMMAND",
+        "precond": "UE context exists on gNB-DU.",
+        "postcond": "gNB-DU starts deallocating resources for the UE context."
       },
       {
-        "from": "Attacker",
+        "from": "gNB-DU",
+        "to": "gNB-CU",
+        "message": "UE CONTEXT RELEASE COMPLETE",
+        "precond": "gNB-DU has completed resource deallocation.",
+        "postcond": "UE context is considered released on gNB-DU."
+      },
+      {
+        "from": "gNB-CU",
         "to": "gNB-DU",
-        "message": "DL RRC Message Transfer",
-        "precond": "The UE context identified by the original F1AP ID/RNTI has been released on gNB-DU. Attacker spoofs gNB-CU and sends this message immediately after release, using the RNTI that was modified in step 1.",
-        "postcond": "gNB-DU attempts to lookup a UE context using the modified RNTI. Due to the previous release and the inconsistent state, this lookup fails or returns invalid data, leading to a memory access violation or similar crash in DU_handle_DL_RRC_MESSAGE_TRANSFER or dl_rrc_message_transfer."
+        "message": "DL RRC MESSAGE TRANSFER",
+        "precond": "UE context for the target F1AP ID is released on gNB-DU. The message contains an F1AP ID that, due to the earlier RNTI modification and subsequent release, leads to an inconsistent state or a dangling pointer during lookup.",
+        "postcond": "gNB-DU attempts UE context lookup, fails due to invalid/released context, and crashes."
       }
     ],
     "state_machine": {
       "states": [
         "Idle",
-        "UE_Context_Established",
-        "UE_Context_Modified_Inconsistent",
+        "UE_Context_Active_Normal",
+        "UE_Context_Active_RNTI_Modified",
         "UE_Context_Releasing",
         "UE_Context_Released",
-        "Crash"
+        "Crashed"
       ],
       "transitions": [
         {
           "from": "Idle",
-          "to": "UE_Context_Established",
-          "on": "UE Context Setup"
+          "to": "UE_Context_Active_Normal",
+          "on": "UE Context Setup Request"
         },
         {
-          "from": "UE_Context_Established",
-          "to": "UE_Context_Modified_Inconsistent",
-          "on": "UE Context Modification Request",
-          "guard": "RNTI in message is modified/invalid"
+          "from": "UE_Context_Active_Normal",
+          "to": "UE_Context_Active_RNTI_Modified",
+          "on": "UE CONTEXT MODIFICATION REQUEST",
+          "guard": "RNTI modified to incorrect value"
         },
         {
-          "from": "UE_Context_Established",
+          "from": "UE_Context_Active_Normal",
           "to": "UE_Context_Releasing",
-          "on": "UE Context Release Command"
+          "on": "UE CONTEXT RELEASE COMMAND"
         },
         {
-          "from": "UE_Context_Modified_Inconsistent",
+          "from": "UE_Context_Active_RNTI_Modified",
           "to": "UE_Context_Releasing",
-          "on": "UE Context Release Command"
+          "on": "UE CONTEXT RELEASE COMMAND"
         },
         {
           "from": "UE_Context_Releasing",
           "to": "UE_Context_Released",
-          "on": "UE Context Release Complete"
+          "on": "UE CONTEXT RELEASE COMPLETE"
         },
         {
           "from": "UE_Context_Released",
-          "to": "Crash",
-          "on": "DL RRC Message Transfer",
-          "guard": "Attempt to lookup UE Context with modified RNTI"
+          "to": "Crashed",
+          "on": "DL RRC MESSAGE TRANSFER",
+          "guard": "UE context lookup fails due to inconsistent RNTI mapping after release"
+        },
+        {
+          "from": "UE_Context_Active_Normal",
+          "to": "UE_Context_Active_Normal",
+          "on": "DL RRC MESSAGE TRANSFER",
+          "guard": "UE context lookup successful"
+        },
+        {
+          "from": "UE_Context_Active_RNTI_Modified",
+          "to": "UE_Context_Active_RNTI_Modified",
+          "on": "DL RRC MESSAGE TRANSFER",
+          "guard": "UE context lookup successful"
         }
       ]
     },
     "assumptions": [
-      "The attacker can spoof F1AP messages (specifically 'UE Context Modification Request' and 'DL RRC Message Transfer') to the gNB-DU, appearing as the gNB-CU.",
-      "The gNB-DU processes the 'UE Context Modification Request' with the modified RNTI, leading to an inconsistent internal state (e.g., updating a lookup table with the incorrect RNTI, but not fully validating it or cleaning up old entries).",
-      "The 'UE Context Release Command' correctly releases the *original* UE context, but the inconsistency introduced by the modified RNTI persists in some form (e.g., a stale entry in a secondary lookup table, or a partially updated context).",
-      "The 'DL RRC Message Transfer' uses the *modified* RNTI for its UE context lookup.",
-      "The crash occurs due to a dereference of a null or freed pointer when 'du_get_f1_ue_data' is called with the modified RNTI after the original context has been released."
+      "The gNB-CU, under attacker control, sends a UE CONTEXT MODIFICATION REQUEST with a C-RNTI value that, while possibly syntactically valid, leads to an inconsistent state or mapping on the gNB-DU after UE release.",
+      "The gNB-DU successfully processes the UE CONTEXT MODIFICATION REQUEST and updates its internal UE context, including the C-RNTI mapping, even if the RNTI value is problematic.",
+      "The UE CONTEXT RELEASE COMMAND on the gNB-DU does not fully or correctly deallocate all resources or clear all internal mappings (e.g., F1AP ID to C-RNTI) related to the UE context, especially after a problematic RNTI modification.",
+      "The DL RRC MESSAGE TRANSFER message, sent after UE release, targets the F1AP ID of the previously released UE.",
+      "The crash occurs because the DL RRC MESSAGE TRANSFER handler attempts to access or dereference an invalid or partially deallocated UE context structure or an inconsistent RNTI mapping during its lookup process."
     ],
     "questions": [
-      "How does the gNB-DU handle an F1AP 'UE Context Modification Request' containing an RNTI that is already associated with an existing UE context, or an RNTI that is syntactically valid but logically incorrect for the current UE?",
-      "Specifically, which RNTI field (e.g., C-RNTI, gNB-DU UE F1AP ID) is being modified by the attacker, and how does this modification affect the gNB-DU's internal UE context lookup mechanisms?",
-      "Does the gNB-DU perform validation on the RNTI/F1AP ID in the 'UE Context Modification Request' to ensure it corresponds to an active, valid UE context?",
-      "What is the exact state of the UE context on the gNB-DU after the 'UE Context Modification Request' with the modified RNTI, and how does 'du_remove_f1_ue_data' interact with this potentially inconsistent state during UE release?",
-      "Does the 'DL RRC MESSAGE TRANSFER' message (spec 9.2.3.2) use 'gNB-DU UE F1AP ID' or 'old gNB-DU UE F1AP ID' for context lookup, and how does the attacker's modified RNTI relate to these fields?",
-      "Is there a race condition between the 'UE Context Release Command' processing and the attacker's 'DL RRC Message Transfer' that exploits a brief window of inconsistency?"
+      "What specific 'incorrect value' for the RNTI triggers this vulnerability? Is it a specific range, a duplicate, or a value that causes a hash collision?",
+      "What is the exact sequence of internal operations on the gNB-DU (e.g., memory deallocation, hash table updates) during UE CONTEXT RELEASE COMMAND that might leave the system vulnerable?",
+      "Does the gNB-DU perform any validation on the C-RNTI provided in the UE CONTEXT MODIFICATION REQUEST to prevent such inconsistencies?",
+      "Is the crash a null pointer dereference, a double-free, or an access to freed memory, and at what specific line of code does it occur?",
+      "Is there a specific timing window between the UE CONTEXT RELEASE COMPLETE and the DL RRC MESSAGE TRANSFER where the vulnerability is exploitable?"
     ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "Directionality of F1AP Messages",
+        "name": "Directionality",
         "result": "PASS",
         "evidence": [
-          "8.3.4 UE Context Modification (gNB-CU initiated)",
-          "8.4.2 DL RRC Message Transfer",
-          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
-          "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER"
+          "UE CONTEXT MODIFICATION REQUEST: gNB-CU to gNB-DU (Spec 9.2.2.7, Code openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST)",
+          "DL RRC MESSAGE TRANSFER: gNB-CU to gNB-DU (Spec 8.4.2.2, Code openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER)",
+          "UE CONTEXT RELEASE COMMAND: gNB-CU to gNB-DU (Code openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_RELEASE_COMMAND)"
         ]
       },
       {
-        "name": "Request/Response Pairing",
+        "name": "Req/Resp Pairing",
         "result": "PASS",
         "evidence": [
-          "9.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-          "9.2.3.2 DL RRC MESSAGE TRANSFER"
+          "UE CONTEXT MODIFICATION REQUEST is followed by UE CONTEXT MODIFICATION RESPONSE (Spec 8.3.4.2)",
+          "UE CONTEXT RELEASE COMMAND is followed by UE CONTEXT RELEASE COMPLETE (Implied by standard F1AP procedure and handler openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_RELEASE_COMMAND)",
+          "DL RRC MESSAGE TRANSFER is a standalone message for forwarding RRC messages, not requiring an F1AP response (Spec 8.4.2.2)"
         ]
       },
       {
-        "name": "UE Identifier Binding and Validation",
+        "name": "ID Binding / Context Handling",
         "result": "FAIL",
         "evidence": [
-          "9.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-          "8.4.2 DL RRC Message Transfer",
-          "8.4.2.2 Successful operation",
-          "9.2.3.2 DL RRC MESSAGE TRANSFER",
-          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
-          "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data",
-          "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER"
+          "Spec 8.4.2.2 states: 'Upon reception of the DL RRC MESSAGE TRANSFER message, the gNB-DU shall perform a UE context lookup using the gNB-DU UE F1AP ID. ... If the UE context is not retrievable, the gNB-DU shall consider the F1-connection establishment for the UE as failed or the UE context as invalid.'",
+          "Observed behavior: 'The gNB-DU crashes upon receiving a DLRRCMessage Transfer message after the UE has been released.'",
+          "Sequence Diagram: 'gNB-DU attempts UE context lookup, fails due to invalid/released context, and crashes.'",
+          "State Machine: 'from: UE_Context_Released, to: Crashed, on: DL RRC MESSAGE TRANSFER, guard: UE context lookup fails due to inconsistent RNTI mapping after release'",
+          "The crash indicates a failure to gracefully handle a non-retrievable UE context, which contradicts the specified behavior of considering the connection failed or context invalid."
         ]
       },
       {
-        "name": "UE Context Release Transaction Scoping",
-        "result": "FAIL",
-        "evidence": [
-          "8.4.2.2 Successful operation",
-          "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_RELEASE_COMMAND",
-          "openair2/F1AP/f1ap_ids.c:du_remove_f1_ue_data",
-          "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER"
-        ]
-      },
-      {
-        "name": "No Pending Request on New Request",
+        "name": "Transaction Scoping",
         "result": "PASS",
-        "evidence": []
+        "evidence": [
+          "UE Context Modification and Release procedures appear to complete their respective transactions (Request/Response, Command/Complete) as per the sequence diagram and snippets. The issue arises from a message arriving after a transaction has completed, not during a pending transaction."
+        ]
+      },
+      {
+        "name": "No-pending-request on new request",
+        "result": "PASS",
+        "evidence": [
+          "The DL RRC MESSAGE TRANSFER arrives after the UE Context Release transaction is complete, meaning there is no pending request for the UE context at the time of the crash. This invariant is not directly violated."
+        ]
       },
       {
         "name": "Timer Preconditions",
         "result": "UNKNOWN",
-        "evidence": []
+        "evidence": [
+          "No specific timers or their preconditions are mentioned in the provided snippets or bug description as being directly involved in triggering the crash. The crash is immediate upon message reception."
+        ]
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The gNB-DU crashes upon receiving a DLRRCMessage Transfer message after UE release, triggered by a prior UE Context Modification Request with a modified RNTI. This indicates a failure in the gNB-DU's implementation to robustly handle invalid or inconsistent UE identifiers and to properly scope the UE context release procedure. Specifically, the specification (8.4.2.2) implies that if a UE context is not retrievable (as it should be after release), the gNB-DU should handle this gracefully by considering the F1-connection as not established, rather than crashing. The crash suggests an incomplete cleanup of resources or an inadequate validation of identifiers during context modification and subsequent lookup, leading to an invalid memory access or similar error."
+    "rationale": "The gNB-DU crashes when it receives a DL RRC MESSAGE TRANSFER message for a UE context that has been released, especially after an RNTI modification. This behavior directly contradicts the F1AP specification (8.4.2.2), which states that if a UE context is not retrievable, the gNB-DU 'shall consider the F1-connection establishment for the UE as failed or the UE context as invalid.' The specification implies a graceful error handling mechanism, not a system crash. The crash indicates a robustness issue in the gNB-DU's implementation (e.g., in `DU_handle_DL_RRC_MESSAGE_TRANSFER` or `dl_rrc_message_transfer` functions) where a failed context lookup or an attempt to access a deallocated/inconsistent resource leads to an unhandled exception or memory corruption, rather than the prescribed controlled error state. This is a clear deviation from the specified error handling, pointing to an implementation bug."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "8.3.4 UE Context Modification (gNB-CU initiated)",
-        "9.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-        "8.4.2 DL RRC Message Transfer",
         "8.4.2.2 Successful operation",
-        "9.2.3.2 DL RRC MESSAGE TRANSFER",
-        "9.3.1.32 C-RNTI"
+        "8.3.4.2 Successful Operation",
+        "9.2.2.7 UE CONTEXT MODIFICATION REQUEST"
       ],
       "code_citations": [
         "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER",
-        "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data",
-        "openair2/F1AP/f1ap_ids.c:du_remove_f1_ue_data",
+        "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c:dl_rrc_message_transfer",
+        "openair2/F1AP/lib/f1ap_ue_context.c:du_exists_f1_ue_data",
         "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
         "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_RELEASE_COMMAND"
       ],
-      "expected_vs_observed": "The observed behavior is that the gNB-DU crashes when it receives a DLRRCMessage Transfer message after the associated UE has been released. This crash is specifically triggered by an attacker first modifying the RNTI in a UE Context Modification request sent to the gNB-CU, and then immediately sending a DLRRCMessage Transfer to the gNB-DU after the UE release. The expected behavior, as per 3GPP specifications (e.g., TS 38.401 and 38.473), is that after a UE context is released, any subsequent messages associated with that context, such as a DL RRC Message Transfer, should be handled gracefully, either by being rejected or ignored, as the UE context should no longer be valid or retrievable. The gNB-DU should robustly handle attempts to access or process messages for a released or invalid UE context, preventing crashes and maintaining system stability, even in the presence of manipulated identifiers like RNTI."
+      "expected_vs_observed": "The observed behavior is that the gNB-DU crashes upon receiving a DLRRCMessage Transfer message after the UE has been released, particularly when an attacker modifies the RNTI in a UE Context Modification request. In contrast, 3GPP specification 8.4.2.2 explicitly states that if the UE context is not retrievable upon reception of a DL RRC MESSAGE TRANSFER message, the gNB-DU shall gracefully handle this by considering the F1-connection establishment for the UE as failed or the UE context as invalid, rather than crashing."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-DU crashes when receiving a DLRRCMessage Transfer message for a UE context that has already been released. This occurs because the gNB-DU fails to robustly validate the existence and validity of the UE context before processing the message, especially after an attacker manipulates the RNTI in a preceding UE Context Modification request. The expected behavior is to gracefully reject or ignore messages for invalid or released contexts, not to crash.",
+      "rationale": "The gNB-DU crashes upon receiving a DLRRCMessage Transfer message for a released UE context, particularly after an RNTI modification attack. This behavior contradicts 3GPP specification 8.4.2.2, which mandates that the gNB-DU should gracefully handle non-retrievable UE contexts by considering the F1-connection failed or the UE context invalid, rather than crashing. The crash indicates a critical failure in robust context handling within the gNB-DU implementation.",
       "citations": {
         "spec": [
-          "8.3.4 UE Context Modification (gNB-CU initiated)",
-          "9.2.2.7 UE CONTEXT MODIFICATION REQUEST",
-          "8.4.2 DL RRC Message Transfer",
           "8.4.2.2 Successful operation",
-          "9.2.3.2 DL RRC MESSAGE TRANSFER",
-          "9.3.1.32 C-RNTI"
+          "8.3.4.2 Successful Operation",
+          "9.2.2.7 UE CONTEXT MODIFICATION REQUEST"
         ],
         "code": [
           "openair2/F1AP/f1ap_du_rrc_message_transfer.c:DU_handle_DL_RRC_MESSAGE_TRANSFER",
-          "openair2/F1AP/f1ap_ids.c:du_get_f1_ue_data",
-          "openair2/F1AP/f1ap_ids.c:du_remove_f1_ue_data",
+          "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.c:dl_rrc_message_transfer",
+          "openair2/F1AP/lib/f1ap_ue_context.c:du_exists_f1_ue_data",
           "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
           "openair2/F1AP/f1ap_du_ue_context_management.c:DU_handle_UE_CONTEXT_RELEASE_COMMAND"
         ]
       },
       "suggested_repro": [
-        "1. Establish a UE context between gNB-CU and gNB-DU.",
-        "2. Send a UE Context Modification request from gNB-CU to gNB-DU with a manipulated RNTI.",
-        "3. Initiate UE release, leading to the gNB-DU releasing the UE context.",
-        "4. Immediately after UE context release, send a DLRRCMessage Transfer message from gNB-CU to gNB-DU, referencing the (now released) UE context.",
-        "5. Observe gNB-DU crash."
+        "Establish a UE context between gNB-CU and gNB-DU.",
+        "Initiate a UE Context Modification procedure, modifying the RNTI in the UE Context Modification Request message.",
+        "Release the UE context using a UE Context Release Command.",
+        "Immediately after UE release, send a DL RRC MESSAGE TRANSFER message to the gNB-DU using the modified/incorrect RNTI.",
+        "Observe the gNB-DU crashing."
       ],
       "risks": [
-        "Denial of Service (DoS) for UEs connected to the affected gNB-DU.",
-        "System instability due to unexpected crashes.",
-        "Potential security vulnerability if exploited by malicious actors."
+        "Denial of Service (DoS): An attacker can crash the gNB-DU, disrupting service for all connected UEs.",
+        "Network Instability: Repeated crashes can lead to widespread network instability and service outages.",
+        "Security Vulnerability: The ability to crash a critical network component with a malformed message represents a significant security flaw."
       ],
       "next_steps": [
-        "Implement robust validation of UE context identifiers (e.g., C-RNTI) in DU_handle_DL_RRC_MESSAGE_TRANSFER to ensure the context is active before processing.",
-        "Ensure that after a UE context is removed, any subsequent attempts to retrieve or use that context ID are gracefully handled (e.g., return an error, log, and discard the message) instead of crashing.",
-        "Review and enhance error handling mechanisms in F1AP message processing, particularly for messages dependent on UE contexts."
+        "Implement robust error handling in DU_handle_DL_RRC_MESSAGE_TRANSFER to gracefully manage cases where the UE context is not found or is invalid, as per 3GPP TS 38.401 clause 8.4.2.2.",
+        "Ensure that context lookup functions (e.g., du_exists_f1_ue_data) return an error code that is properly handled, leading to logging and discarding the message, rather than a crash.",
+        "Review all F1AP message handlers for similar vulnerabilities where invalid or stale UE contexts could lead to crashes.",
+        "Consider adding fuzz testing for F1AP messages, especially after context release or modification, to uncover similar issues."
       ]
     }
   }

@@ -1,14 +1,14 @@
 {
   "step1": {
     "bug_card": {
-      "observed_behavior": "gNB-CU experiences a segmentation fault upon receiving a UE Context Modification Response with a mutated DU ID, after an attacker modified the RNTI in the IE to an incorrect value and sent a DLRRCMessage Transfer following a UE release.",
+      "observed_behavior": "gNB-CU experiences a segmentation fault upon receiving a UE Context Modification Response with a mutated DU ID, after an attacker modified the RNTI in the UE Context Modification request to an incorrect value and sent a DLRRCMessage Transfer following UE release.",
       "interface_guess": [
         "F1AP",
         "RRC"
       ],
       "procedure_guess": [
         "UE Context Modification",
-        "UE Release"
+        "UE release"
       ],
       "components_involved": [
         "gNB-CU",
@@ -16,11 +16,11 @@
         "UE"
       ],
       "key_ids": {
-        "du_id": "mutated DU ID",
-        "rnti": "incorrect value"
+        "du_id": "mutated",
+        "rnti": "incorrect"
       },
       "signals_or_timers": [
-        "UE Context Modification Request",
+        "UE Context Modification request",
         "UE Context Modification Response",
         "DLRRCMessage Transfer"
       ]
@@ -32,156 +32,338 @@
         "Keywords": [
           "UE Context Modification",
           "gNB-CU initiated",
-          "gNB-CU",
-          "gNB-DU",
           "procedure"
         ],
         "title": [
-          "UE Context Modification (gNB-CU initiated)"
+          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)"
         ]
       },
       {
         "Keywords": [
+          "UE Context Modification",
           "Successful Operation",
-          "UE CONTEXT MODIFICATION RESPONSE",
-          "gNB-DU UE F1AP ID",
-          "C-RNTI",
-          "UE Context"
-        ],
-        "title": [
-          "UE Context Modification (gNB-CU initiated)",
-          "Successful Operation"
-        ]
-      },
-      {
-        "Keywords": [
-          "Abnormal Conditions",
-          "error handling",
+          "gNB-DU",
+          "gNB-CU",
           "UE CONTEXT MODIFICATION REQUEST",
-          "cause value",
-          "invalid IE"
-        ],
-        "title": [
-          "UE Context Modification (gNB-CU initiated)",
-          "Abnormal Conditions"
-        ]
-      },
-      {
-        "Keywords": [
-          "Message Definition",
           "UE CONTEXT MODIFICATION RESPONSE",
-          "gNB-DU UE F1AP ID",
-          "C-RNTI",
-          "Information Elements"
-        ],
-        "title": [
-          "UE CONTEXT MODIFICATION RESPONSE"
-        ]
-      },
-      {
-        "Keywords": [
-          "Information Element",
-          "gNB-DU UE F1AP ID",
-          "identifier",
-          "UE association",
-          "F1 interface"
-        ],
-        "title": [
-          "gNB-DU UE F1AP ID"
-        ]
-      },
-      {
-        "Keywords": [
-          "Information Element",
-          "C-RNTI",
-          "identifier",
-          "UE context"
-        ],
-        "title": [
           "C-RNTI"
+        ],
+        "title": [
+          "\u00a78.3.4.2 Successful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Modification",
+          "Unsuccessful Operation",
+          "gNB-DU",
+          "UE CONTEXT MODIFICATION FAILURE",
+          "cause value"
+        ],
+        "title": [
+          "\u00a78.3.4.3 Unsuccessful Operation"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Modification",
+          "Abnormal Conditions",
+          "gNB-DU",
+          "UE CONTEXT MODIFICATION REQUEST",
+          "DRB Failed to Setup List",
+          "cause value"
+        ],
+        "title": [
+          "\u00a78.3.4.4 Abnormal Conditions"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Modification Request",
+          "message definition",
+          "gNB-CU UE F1AP ID",
+          "gNB-DU UE F1AP ID",
+          "SRB ID",
+          "RRC-Container"
+        ],
+        "title": [
+          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST"
+        ]
+      },
+      {
+        "Keywords": [
+          "UE Context Modification Response",
+          "message definition",
+          "gNB-CU UE F1AP ID",
+          "gNB-DU UE F1AP ID",
+          "C-RNTI",
+          "DRB Setup List",
+          "DRB Modified List"
+        ],
+        "title": [
+          "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE"
         ]
       }
     ],
-    "expected_behaviour": "The gNB-CU should not experience a segmentation fault. Instead, it should gracefully handle the UE Context Modification Response message containing a mutated gNB-DU UE F1AP ID or an incorrect C-RNTI. This handling should involve validation of the received Information Elements and, upon detecting an invalid or inconsistent value, the gNB-CU should reject the message, log an error, and/or initiate an appropriate error recovery procedure as defined by the F1AP protocol specification."
+    "expected_behaviour": "The gNB-DU shall validate the RNTI and gNB-DU UE F1AP ID received in the UE CONTEXT MODIFICATION REQUEST. If the RNTI is incorrect or the gNB-DU UE F1AP ID is mutated or inconsistent, the gNB-DU shall respond with a UE CONTEXT MODIFICATION FAILURE message, indicating an appropriate cause value such as 'Unknown or inconsistent pair of UE F1AP ID' or 'UE rejection'. The gNB-CU, upon receiving a UE CONTEXT MODIFICATION RESPONSE with a mutated gNB-DU UE F1AP ID, shall handle the invalid ID gracefully without experiencing a segmentation fault, potentially logging an error and terminating the UE context."
   },
   "step3": {
     "candidate_code": [
       {
         "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
         "function_name": "CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE",
-        "reason": "This function is the direct handler for the F1AP UE Context Modification Response message on the gNB-CU side, which is explicitly stated as the point of segmentation fault."
+        "reason": "Directly handles the F1AP UE Context Modification Response on the gNB-CU, where the segmentation fault is observed with a mutated DU ID."
       },
       {
-        "path": "openair2/F1AP/f1ap_handlers.c",
-        "function_name": "f1ap_decode_pdu",
-        "reason": "This function is responsible for decoding all incoming F1AP PDUs. A mutated DU ID or incorrect RNTI in the received message could lead to decoding errors or misinterpretation, potentially causing a segfault during subsequent processing."
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_send_UE_CONTEXT_MODIFICATION_REQUEST",
+        "reason": "CU initiates UE Context Modification, relevant for understanding the request that might have had an incorrect RNTI."
       },
       {
-        "path": "openair2/F1AP/f1ap_handlers.c",
-        "function_name": "f1ap_handle_message",
-        "reason": "This function dispatches decoded F1AP messages to their specific handlers. Issues in dispatching or initial validation could contribute to the bug."
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_handle_UE_CONTEXT_MODIFICATION_REQUIRED",
+        "reason": "Handles UE Context Modification Required messages from the DU, which can trigger CU-initiated modifications."
       },
       {
-        "path": "openair2/RRC/NR/rrc_gNB_UE_context.c",
-        "function_name": "rrc_gNB_get_ue_context",
-        "reason": "After the F1AP layer processes the message, the RRC layer will likely use this function to retrieve the UE context based on the gNB-CU UE ID. An incorrect RNTI or mutated DU ID could lead to an invalid context lookup or access, resulting in a segfault."
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_send_UE_CONTEXT_MODIFICATION_CONFIRM",
+        "reason": "CU sends confirmation for UE Context Modification, part of the modification procedure."
       },
       {
-        "path": "openair2/RRC/NR/rrc_gNB_UE_context.c",
-        "function_name": "rrc_gNB_remove_ue_context",
-        "reason": "The bug description mentions 'following a UE release'. This function is responsible for cleaning up UE contexts. If the release process is flawed due to incorrect IDs, it could leave a corrupted state that contributes to the later segfault."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "cu_get_f1_ue_data",
-        "reason": "This function manages the mapping between CU and DU UE IDs. A 'mutated DU ID' could cause an invalid lookup or data retrieval from this mapping, leading to a segfault."
-      },
-      {
-        "path": "openair2/F1AP/f1ap_ids.c",
-        "function_name": "cu_remove_f1_ue_data",
-        "reason": "This function is used during UE release to remove ID mappings. If the release process is compromised by incorrect IDs, it could lead to an inconsistent state."
+        "path": "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "function_name": "CU_send_UE_CONTEXT_MODIFICATION_REFUSE",
+        "reason": "CU sends refusal for UE Context Modification, part of the modification procedure."
       },
       {
         "path": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
         "function_name": "CU_handle_UL_RRC_MESSAGE_TRANSFER",
-        "reason": "The bug mentions an attacker sending a DLRRCMessage Transfer with a mutated RNTI. If the attacker acts as a malicious DU, the CU would receive this as an UL RRC Message Transfer. This function would process the incorrect RNTI, potentially corrupting the UE state before the final segfault."
+        "reason": "Handles Uplink RRC Message Transfer, which might contain RNTI information relevant to the attack."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
+        "function_name": "CU_send_DL_RRC_MESSAGE_TRANSFER",
+        "reason": "Handles Downlink RRC Message Transfer, explicitly mentioned in the attack sequence following UE release."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_get_f1_ue_data",
+        "reason": "Retrieves CU-DU UE ID mapping, critical for identifying if a 'mutated DU ID' is used or if an 'incorrect RNTI' leads to incorrect mapping retrieval."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_add_f1_ue_data",
+        "reason": "Adds CU-DU UE ID mapping, relevant for initial UE context setup."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "cu_remove_f1_ue_data",
+        "reason": "Removes CU-DU UE ID mapping, relevant for the 'UE release' part of the attack sequence."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "du_get_f1_ue_data",
+        "reason": "Retrieves DU-CU UE ID mapping, relevant for understanding the DU's perspective on UE ID management."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "du_add_f1_ue_data",
+        "reason": "Adds DU-CU UE ID mapping."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_ids.c",
+        "function_name": "du_remove_f1_ue_data",
+        "reason": "Removes DU-CU UE ID mapping."
+      },
+      {
+        "path": "openair2/RRC/NR/rrc_gNB_UE_context.c",
+        "function_name": "rrc_gNB_get_ue_context",
+        "reason": "Generic UE context retrieval at the RRC layer, used to find UE information."
+      },
+      {
+        "path": "openair2/RRC/NR/rrc_gNB_UE_context.c",
+        "function_name": "rrc_gNB_get_ue_context_by_rnti",
+        "reason": "Retrieves UE context by RNTI, directly relevant to handling 'incorrect RNTI' values."
+      },
+      {
+        "path": "openair2/RRC/NR/rrc_gNB_UE_context.c",
+        "function_name": "rrc_gNB_create_ue_context",
+        "reason": "UE context creation at the RRC layer."
+      },
+      {
+        "path": "openair2/RRC/NR/rrc_gNB_UE_context.c",
+        "function_name": "rrc_gNB_remove_ue_context",
+        "reason": "UE context removal at the RRC layer, part of the 'UE release' procedure."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_handlers.c",
+        "function_name": "f1ap_handle_message",
+        "reason": "The central dispatcher for all incoming F1AP messages, routes to specific handlers like UE Context Modification Response."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "function_name": "DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
+        "reason": "DU side handler for UE Context Modification Request, providing context for the CU's response."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "function_name": "DU_send_UE_CONTEXT_MODIFICATION_RESPONSE",
+        "reason": "DU side function for sending UE Context Modification Response, which is the problematic message received by the CU."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "function_name": "DU_handle_UE_CONTEXT_MODIFICATION_CONFIRM",
+        "reason": "DU side handler for UE Context Modification Confirm."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "function_name": "DU_handle_UE_CONTEXT_MODIFICATION_REFUSE",
+        "reason": "DU side handler for UE Context Modification Refuse."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_ue_context_management.c",
+        "function_name": "DU_send_UE_CONTEXT_MODIFICATION_REQUIRED",
+        "reason": "DU side function for sending UE Context Modification Required."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
+        "function_name": "DU_handle_DL_RRC_MESSAGE_TRANSFER",
+        "reason": "DU side handler for Downlink RRC Message Transfer, part of the attack sequence."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
+        "function_name": "DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "reason": "DU side function for sending Initial Uplink RRC Message Transfer."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
+        "function_name": "DU_send_UL_NR_RRC_MESSAGE_TRANSFER",
+        "reason": "DU side function for sending Uplink RRC Message Transfer."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_task.c",
+        "function_name": "F1AP_DU_task",
+        "reason": "Main task loop for the DU F1AP, responsible for processing ITTI messages and interacting with SCTP."
+      },
+      {
+        "path": "openair2/F1AP/f1ap_du_task.c",
+        "function_name": "du_task_handle_sctp_data_ind",
+        "reason": "Handles incoming SCTP data indications, which include F1AP messages, and dispatches them to the F1AP handler."
       },
       {
         "path": "openair2/COMMON/f1ap_messages_types.h",
-        "function_name": "f1ap_ue_context_mod_resp_t",
-        "reason": "This header defines the structure of the F1AP UE Context Modification Response message, including the gNB-DU UE F1AP ID and other relevant identifiers. Understanding its definition is crucial for analyzing the impact of mutated IDs."
+        "function_name": "definitions",
+        "reason": "Defines the ITTI message structures for F1AP, essential for understanding the data exchanged between tasks for UE Context Modification and RRC Message Transfer."
       },
       {
         "path": "openair2/RRC/NR/rrc_gNB_UE_context.h",
-        "function_name": "rrc_gNB_ue_context_t",
-        "reason": "This header defines the structure of the RRC UE context, which is manipulated based on F1AP messages and stores the RNTI. Corruption or incorrect access to this structure could lead to a segfault."
+        "function_name": "definitions",
+        "reason": "Header file defining the RRC UE context structure, which holds RNTI and other UE-specific information."
       },
       {
-        "path": "openair2/COMMON/rrc_messages_types.h",
-        "function_name": "NRNasConnReleaseInd",
-        "reason": "This header defines RRC message types, including those related to UE release and connection establishment/release, which are part of the bug context and attack sequence."
+        "path": "openair2/F1AP/f1ap_ids.h",
+        "function_name": "definitions",
+        "reason": "Header file defining the F1AP UE ID mapping structures, used by f1ap_ids.c."
+      },
+      {
+        "path": "common/ran_context.h",
+        "function_name": "definitions",
+        "reason": "Global RAN context definitions, providing overall system context."
       }
     ],
     "control": {
       "decision": "continue",
       "fetch_requests": [
         {
-          "pattern": "openair2/RRC/NR/**/*.c",
+          "pattern": "openair2/F1AP/f1ap_cu_ue_context_management.c",
           "suffix": [
-            "c"
-          ]
+            "c",
+            "h"
+          ],
+          "max_files": 1
         },
         {
-          "pattern": "openair2/RRC/NR/**/*.h",
+          "pattern": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
           "suffix": [
+            "c",
             "h"
-          ]
+          ],
+          "max_files": 1
         },
         {
-          "pattern": "openair2/COMMON/**/*.h",
+          "pattern": "openair2/F1AP/f1ap_ids.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/RRC/NR/rrc_gNB_UE_context.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_handlers.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_du_ue_context_management.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_du_rrc_message_transfer.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_du_task.c",
+          "suffix": [
+            "c",
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/COMMON/f1ap_messages_types.h",
           "suffix": [
             "h"
-          ]
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/RRC/NR/rrc_gNB_UE_context.h",
+          "suffix": [
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "openair2/F1AP/f1ap_ids.h",
+          "suffix": [
+            "h"
+          ],
+          "max_files": 1
+        },
+        {
+          "pattern": "common/ran_context.h",
+          "suffix": [
+            "h"
+          ],
+          "max_files": 1
         }
       ]
     }
@@ -190,88 +372,193 @@
     "snippets": [
       {
         "kind": "spec",
-        "source": "UE Context Modification (gNB-CU initiated)",
-        "location": "UE Context Modification (gNB-CU initiated)"
+        "source": "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
+        "location": "\u00a78.3.4 UE Context Modification (gNB-CU initiated)"
       },
       {
         "kind": "spec",
-        "source": "UE Context Modification (gNB-CU initiated)",
-        "location": "Successful Operation"
+        "source": "\u00a78.3.4.2 Successful Operation",
+        "location": "\u00a78.3.4.2 Successful Operation"
       },
       {
         "kind": "spec",
-        "source": "UE Context Modification (gNB-CU initiated)",
-        "location": "Abnormal Conditions"
+        "source": "\u00a78.3.4.3 Unsuccessful Operation",
+        "location": "\u00a78.3.4.3 Unsuccessful Operation"
       },
       {
         "kind": "spec",
-        "source": "UE CONTEXT MODIFICATION RESPONSE",
-        "location": "Message Definition"
+        "source": "\u00a78.3.4.4 Abnormal Conditions",
+        "location": "\u00a78.3.4.4 Abnormal Conditions"
       },
       {
         "kind": "spec",
-        "source": "gNB-DU UE F1AP ID",
-        "location": "Information Element"
+        "source": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
+        "location": "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST"
       },
       {
         "kind": "spec",
-        "source": "C-RNTI",
-        "location": "Information Element"
+        "source": "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE",
+        "location": "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_cu_ue_context_management.c",
-        "location": "CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE:79-90"
+        "source": "CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_handlers.c",
-        "location": "f1ap_decode_pdu:60-74"
+        "source": "CU_send_UE_CONTEXT_MODIFICATION_REQUEST",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_handlers.c",
-        "location": "f1ap_handle_message:76-107"
+        "source": "CU_handle_UE_CONTEXT_MODIFICATION_REQUIRED",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c"
       },
       {
         "kind": "code",
-        "source": "openair2/RRC/NR/rrc_gNB_UE_context.c",
-        "location": "rrc_gNB_get_ue_context:49-54"
+        "source": "CU_send_UE_CONTEXT_MODIFICATION_CONFIRM",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c"
       },
       {
         "kind": "code",
-        "source": "openair2/RRC/NR/rrc_gNB_UE_context.c",
-        "location": "rrc_gNB_remove_ue_context:100-115"
+        "source": "CU_send_UE_CONTEXT_MODIFICATION_REFUSE",
+        "location": "openair2/F1AP/f1ap_cu_ue_context_management.c"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_ids.c",
-        "location": "cu_get_f1_ue_data:70-75"
+        "source": "CU_handle_UL_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_ids.c",
-        "location": "cu_remove_f1_ue_data:81-86"
+        "source": "CU_send_DL_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c"
       },
       {
         "kind": "code",
-        "source": "openair2/F1AP/f1ap_cu_rrc_message_transfer.c",
-        "location": "CU_handle_UL_RRC_MESSAGE_TRANSFER:60-99"
+        "source": "cu_get_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c"
       },
       {
         "kind": "code",
-        "source": "openair2/COMMON/f1ap_messages_types.h",
-        "location": "f1ap_ue_context_mod_resp:409-417"
+        "source": "cu_add_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c"
       },
       {
         "kind": "code",
-        "source": "openair2/RRC/NR/rrc_gNB_UE_context.h",
-        "location": "rrc_gNB_ue_context_s:31-31"
+        "source": "cu_remove_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c"
       },
       {
         "kind": "code",
-        "source": "openair2/COMMON/rrc_messages_types.h",
-        "location": "NRNasConnReleaseInd:443-446"
+        "source": "du_get_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c"
+      },
+      {
+        "kind": "code",
+        "source": "du_add_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c"
+      },
+      {
+        "kind": "code",
+        "source": "du_remove_f1_ue_data",
+        "location": "openair2/F1AP/f1ap_ids.c"
+      },
+      {
+        "kind": "code",
+        "source": "rrc_gNB_get_ue_context",
+        "location": "openair2/RRC/NR/rrc_gNB_UE_context.c"
+      },
+      {
+        "kind": "code",
+        "source": "rrc_gNB_get_ue_context_by_rnti",
+        "location": "openair2/RRC/NR/rrc_gNB_UE_context.c"
+      },
+      {
+        "kind": "code",
+        "source": "rrc_gNB_create_ue_context",
+        "location": "openair2/RRC/NR/rrc_gNB_UE_context.c"
+      },
+      {
+        "kind": "code",
+        "source": "rrc_gNB_remove_ue_context",
+        "location": "openair2/RRC/NR/rrc_gNB_UE_context.c"
+      },
+      {
+        "kind": "code",
+        "source": "f1ap_handle_message",
+        "location": "openair2/F1AP/f1ap_handlers.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_handle_UE_CONTEXT_MODIFICATION_REQUEST",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_send_UE_CONTEXT_MODIFICATION_RESPONSE",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_handle_UE_CONTEXT_MODIFICATION_CONFIRM",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_handle_UE_CONTEXT_MODIFICATION_REFUSE",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_send_UE_CONTEXT_MODIFICATION_REQUIRED",
+        "location": "openair2/F1AP/f1ap_du_ue_context_management.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_handle_DL_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_du_rrc_message_transfer.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_send_INITIAL_UL_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_du_rrc_message_transfer.c"
+      },
+      {
+        "kind": "code",
+        "source": "DU_send_UL_NR_RRC_MESSAGE_TRANSFER",
+        "location": "openair2/F1AP/f1ap_du_rrc_message_transfer.c"
+      },
+      {
+        "kind": "code",
+        "source": "F1AP_DU_task",
+        "location": "openair2/F1AP/f1ap_du_task.c"
+      },
+      {
+        "kind": "code",
+        "source": "du_task_handle_sctp_data_ind",
+        "location": "openair2/F1AP/f1ap_du_task.c"
+      },
+      {
+        "kind": "code",
+        "source": "definitions",
+        "location": "openair2/COMMON/f1ap_messages_types.h"
+      },
+      {
+        "kind": "code",
+        "source": "definitions",
+        "location": "openair2/RRC/NR/rrc_gNB_UE_context.h"
+      },
+      {
+        "kind": "code",
+        "source": "definitions",
+        "location": "openair2/F1AP/f1ap_ids.h"
+      },
+      {
+        "kind": "code",
+        "source": "definitions",
+        "location": "common/ran_context.h"
       }
     ]
   },
@@ -280,204 +567,218 @@
       {
         "from": "gNB-CU",
         "to": "gNB-DU",
-        "message": "UE Context Release Request",
-        "precond": "An active UE context exists on both gNB-CU and gNB-DU for a specific UE.",
-        "postcond": "gNB-DU receives the request and initiates UE context release procedures."
+        "message": "UE Context Modification Request",
+        "precond": "UE context active on CU and DU",
+        "postcond": "gNB-DU receives request with attacker-modified incorrect RNTI"
+      },
+      {
+        "from": "gNB-DU",
+        "to": "gNB-DU",
+        "message": "Process UE Context Modification Request",
+        "precond": "gNB-DU received request with incorrect RNTI",
+        "postcond": "gNB-DU internal state potentially corrupted or inconsistent"
+      },
+      {
+        "from": "gNB-CU/gNB-DU",
+        "to": "gNB-CU/gNB-DU",
+        "message": "UE Context Release Procedure Complete",
+        "precond": "UE context exists on CU and DU",
+        "postcond": "UE context removed from CU and DU"
+      },
+      {
+        "from": "Attacker",
+        "to": "gNB-DU",
+        "message": "DLRRCMessage Transfer",
+        "precond": "UE context released on gNB-DU",
+        "postcond": "gNB-DU receives DLRRCMessage Transfer for non-existent UE, potentially further corrupting state"
       },
       {
         "from": "gNB-DU",
         "to": "gNB-CU",
-        "message": "UE Context Release Complete",
-        "precond": "gNB-DU has successfully released the UE context.",
-        "postcond": "gNB-CU removes the corresponding UE context (e.g., via cu_remove_f1_ue_data, rrc_gNB_remove_ue_context). The UE context is now considered stale/non-existent on gNB-CU."
-      },
-      {
-        "from": "Attacker (spoofing gNB-DU)",
-        "to": "gNB-CU",
-        "message": "UE Context Modification Response (crafted)",
-        "precond": "The UE context for the target UE has been released on gNB-CU. Attacker has knowledge of F1AP protocol and can spoof gNB-DU.",
-        "postcond": "gNB-CU receives a malformed UE Context Modification Response message containing a mutated DU ID and an incorrect RNTI."
+        "message": "UE Context Modification Response",
+        "precond": "gNB-DU processed initial request and UE is released; DU ID is mutated",
+        "postcond": "gNB-CU receives response with mutated DU ID"
       },
       {
         "from": "gNB-CU",
         "to": "gNB-CU",
-        "message": "Handle UE Context Modification Response",
-        "precond": "gNB-CU has received the crafted UE Context Modification Response.",
-        "postcond": "gNB-CU attempts to look up a UE context using the provided (mutated/incorrect) IDs. Due to the non-existence of the context and/or invalid IDs, a null pointer dereference or out-of-bounds access occurs, leading to a segmentation fault."
+        "message": "Process UE Context Modification Response",
+        "precond": "gNB-CU received response with mutated DU ID; UE context already released",
+        "postcond": "gNB-CU experiences segmentation fault due to invalid UE context lookup"
       }
     ],
     "state_machine": {
       "states": [
         "UE_Context_Active",
-        "UE_Context_Modifying",
+        "UE_Context_Modification_Pending",
         "UE_Context_Releasing",
         "UE_Context_Released",
-        "System_Crashed"
+        "Segmentation_Fault"
       ],
       "transitions": [
         {
           "from": "UE_Context_Active",
-          "to": "UE_Context_Modifying",
-          "on": "gNB-CU sends UE Context Modification Request"
+          "to": "UE_Context_Modification_Pending",
+          "on": "CU_sends_UE_Context_Modification_Request",
+          "guard": "RNTI_modified_by_attacker"
         },
         {
-          "from": "UE_Context_Modifying",
-          "to": "UE_Context_Active",
-          "on": "gNB-CU receives UE Context Modification Response",
-          "guard": "Valid DU ID and RNTI"
-        },
-        {
-          "from": "UE_Context_Active",
+          "from": "UE_Context_Modification_Pending",
           "to": "UE_Context_Releasing",
-          "on": "gNB-CU sends UE Context Release Request"
+          "on": "CU_initiates_UE_Release",
+          "guard": "UE_Context_Modification_Response_still_pending"
         },
         {
           "from": "UE_Context_Releasing",
           "to": "UE_Context_Released",
-          "on": "gNB-CU receives UE Context Release Complete"
+          "on": "UE_Release_Procedure_Complete"
         },
         {
           "from": "UE_Context_Released",
-          "to": "System_Crashed",
-          "on": "gNB-CU receives crafted UE Context Modification Response",
-          "guard": "Mutated DU ID OR Incorrect RNTI AND UE Context not found"
-        },
-        {
-          "from": "UE_Context_Modifying",
-          "to": "System_Crashed",
-          "on": "gNB-CU receives crafted UE Context Modification Response",
-          "guard": "Mutated DU ID OR Incorrect RNTI AND UE Context lookup fails"
-        },
-        {
-          "from": "UE_Context_Active",
-          "to": "System_Crashed",
-          "on": "gNB-CU receives crafted UE Context Modification Response",
-          "guard": "Mutated DU ID OR Incorrect RNTI AND UE Context lookup fails"
+          "to": "Segmentation_Fault",
+          "on": "CU_receives_UE_Context_Modification_Response",
+          "guard": "DU_ID_mutated_and_UE_context_not_found_on_CU"
         }
       ]
     },
     "assumptions": [
-      "The attacker is able to craft and send F1AP messages to the gNB-CU, spoofing the gNB-DU.",
-      "The 'DLRRCMessage Transfer' mentioned in the bug description is either a typo (should be ULRRCMessage Transfer) or a separate, preceding attack vector that sets up conditions but is not the direct cause of the segfault. The sequence diagram focuses on the direct cause.",
-      "'Mutated DU ID' means an F1AP ID that does not correspond to any active UE context on the gNB-CU, or is malformed.",
-      "'Incorrect RNTI' means a C-RNTI that does not correspond to any active UE context on the gNB-CU, or is malformed.",
-      "The gNB-CU does not properly validate the F1AP UE ID (gNB-DU UE F1AP ID) or the RRC C-RNTI in the UE Context Modification Response against its internal state, especially after a UE context has been released.",
-      "The segfault occurs during the lookup or access of a UE context structure that is either null, freed, or points to invalid memory, triggered by the invalid IDs in the received message."
+      "The attacker has the ability to intercept and modify F1AP messages (specifically UE Context Modification Request).",
+      "The attacker has the ability to inject F1AP messages (specifically DLRRCMessage Transfer).",
+      "The UE Release procedure successfully removes the UE context from both gNB-CU and gNB-DU.",
+      "The DLRRCMessage Transfer sent by the attacker after UE release contributes to the 'mutated DU ID' or the 'UE context not found' condition on the gNB-DU side, leading to the problematic response.",
+      "The 'mutated DU ID' in the UE Context Modification Response is either a direct result of attacker action or an indirect consequence of the incorrect RNTI and/or the DLRRCMessage Transfer on the gNB-DU.",
+      "The gNB-CU expects a UE Context Modification Response for a UE that has already been released, leading to a lookup failure and segmentation fault."
     ],
     "questions": [
-      "What is the exact role of the 'DLRRCMessage Transfer' in this attack scenario? Is it a prerequisite, a separate attack, or a misstatement in the bug report?",
-      "At which specific line of code does the segmentation fault occur within CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE or related functions (cu_get_f1_ue_data, rrc_gNB_get_ue_context)?",
-      "Is there any mechanism to authenticate F1AP messages from the gNB-DU to prevent spoofing?",
-      "How are the 'mutated DU ID' and 'incorrect RNTI' generated by the attacker? Are they random, or do they target specific memory patterns?",
-      "Does the gNB-CU maintain any temporary or cached state for released UEs that could be targeted by such a message?"
+      "How does the attacker modify the RNTI in the UE Context Modification Request? Is it an integrity protection bypass or a timing attack?",
+      "How does the attacker send a DLRRCMessage Transfer? Does it involve impersonating the gNB-CU or exploiting a vulnerability in the F1AP interface?",
+      "What is the exact mechanism by which the DU ID becomes 'mutated' in the UE Context Modification Response? Is it directly manipulated by the attacker, or is it a side effect of the gNB-DU processing the incorrect RNTI/DLRRCMessage Transfer for a released UE?",
+      "What specific data structure or pointer dereference causes the segmentation fault in the gNB-CU when processing the UE Context Modification Response with a mutated DU ID for a released UE?",
+      "Is the UE Release procedure initiated by the gNB-CU, gNB-DU, or another entity, and is it a normal or abnormal release?",
+      "Does the gNB-DU perform any validation on the RNTI in the UE Context Modification Request before attempting to use it?",
+      "Does the gNB-CU maintain a list of pending UE Context Modification Requests and their associated UE contexts, and how does it handle responses for already released UEs?"
     ]
   },
   "step6": {
     "invariant_checks": [
       {
-        "name": "Directionality",
+        "name": "directionality",
         "result": "PASS",
         "evidence": [
-          "The attacker spoofs gNB-DU to gNB-CU, which is the correct direction for a UE Context Modification Response as per the F1AP specification for 'UE Context Modification (gNB-CU initiated)' where the gNB-CU initiates the procedure and the gNB-DU responds."
+          "UE Context Modification Request (CU->DU) is consistent with 'CU_send_UE_CONTEXT_MODIFICATION_REQUEST' and '\u00a78.3.4 UE Context Modification (gNB-CU initiated)'.",
+          "UE Context Modification Response (DU->CU) is consistent with 'DU_send_UE_CONTEXT_MODIFICATION_RESPONSE' and '\u00a78.3.4.2 Successful Operation'.",
+          "The DLRRCMessage Transfer from the Attacker to gNB-DU is an external injection; the protocol's defined direction for this message type (CU->DU) is not violated by legitimate entities."
         ]
       },
       {
-        "name": "Request-Response Pairing",
+        "name": "req/resp pairing",
         "result": "FAIL",
         "evidence": [
-          "The gNB-CU receives a 'UE Context Modification Response' without having sent a corresponding 'UE Context Modification Request'. The sequence diagram explicitly shows 'UE Context Release Complete' followed by 'gNB-CU removes the corresponding UE context' before the 'UE Context Modification Response (crafted)' is received. The 'UE Context Modification (gNB-CU initiated)' spec snippet implies a request must precede a response for a valid transaction."
+          "The 'sequence_diagram' shows the gNB-CU receiving a 'UE Context Modification Response' after the 'UE Context Release Procedure Complete' for the same UE, indicating a response for a transaction that should no longer be active.",
+          "The 'state_machine' explicitly shows a transition from 'UE_Context_Released' to 'Segmentation_Fault' on 'CU_receives_UE_Context_Modification_Response' when 'UE_context_not_found_on_CU', confirming a pairing mismatch."
         ]
       },
       {
-        "name": "ID Binding and Context Validity",
+        "name": "ID binding (e.g., CU/DU UE F1AP ID)",
         "result": "FAIL",
         "evidence": [
-          "The 'UE Context Modification Response (crafted)' contains a 'mutated DU ID' and an 'incorrect RNTI'. The sequence diagram states 'The UE context for the target UE has been released on gNB-CU'. Code snippets like 'rrc_gNB_get_ue_context' (openair2/RRC/NR/rrc_gNB_UE_context.c:49-54) and 'cu_get_f1_ue_data' (openair2/F1AP/f1ap_ids.c:70-75) are used to retrieve UE contexts based on these IDs. Since the context is released, these IDs, even if syntactically valid, would not map to an existing active context, leading to a lookup failure. The 'gNB-DU UE F1AP ID' and 'C-RNTI' spec snippets define these critical identifiers."
+          "The 'bug_card' states the 'UE Context Modification Response' contains a 'mutated DU ID', which implies an invalid or unresolvable identifier for an active UE context on the CU.",
+          "The 'state_machine' guard 'DU_ID_mutated_and_UE_context_not_found_on_CU' directly links the mutated ID to the failure.",
+          "The initial 'UE Context Modification Request' having an 'incorrect RNTI' also indicates a failure in ID consistency or validation at an earlier stage."
         ]
       },
       {
-        "name": "Transaction Scoping",
+        "name": "transaction scoping",
         "result": "FAIL",
         "evidence": [
-          "The 'UE Context Modification Response' is received after the UE context has been explicitly released on the gNB-CU, as shown in the sequence diagram ('gNB-CU removes the corresponding UE context'). This means any transaction related to this UE context, including modification, should be considered terminated or invalid. The state machine transition from 'UE_Context_Released' to 'System_Crashed' on 'gNB-CU receives crafted UE Context Modification Response' with guard 'UE Context not found' confirms this violation of transaction scope."
+          "The 'sequence_diagram' illustrates that the 'UE Context Release Procedure Complete' occurs before the 'UE Context Modification Response' is processed by the gNB-CU, meaning the modification transaction was not properly terminated or cancelled upon UE context release.",
+          "The 'state_machine' includes a guard 'UE_Context_Modification_Response_still_pending' during the 'UE_Context_Releasing' state, suggesting the transaction's scope is not correctly tied to the UE context's active lifecycle."
         ]
       },
       {
-        "name": "No Pending Request on New Request",
+        "name": "no-pending-request on new request",
         "result": "UNKNOWN",
         "evidence": [
-          "This invariant typically applies to a component initiating a new request while a previous one of the same type is still pending. The bug involves receiving an unsolicited *response*, not sending a new request. Therefore, this invariant is not directly applicable to the observed behavior."
+          "This invariant is not directly applicable to the core issue, which involves a late response to an old request rather than a new request being initiated while another for the same resource is pending. The DLRRCMessage Transfer from the attacker is an external event, not a standard protocol-initiated new request."
         ]
       },
       {
-        "name": "Timer Preconditions",
-        "result": "UNKNOWN",
+        "name": "timer preconditions",
+        "result": "FAIL",
         "evidence": [
-          "The bug scenario does not involve the expiration or active state of any specific timers as a direct trigger or precondition for the crash. The issue is the receipt of an unsolicited message after context release, not a delayed response to a timed-out request."
+          "The 'state_machine' indicates that a 'UE Context Modification Response' is still considered 'pending' even during the 'UE_Context_Releasing' state, and its subsequent arrival after 'UE_Context_Released' leads to a crash.",
+          "This suggests that the gNB-CU either lacks a proper timer for the UE Context Modification procedure, or fails to correctly handle its expiration or cancel the pending transaction upon UE context release, leading to the processing of stale messages."
         ]
       }
     ],
     "preliminary_verdict": "implementation-bug",
-    "rationale": "The gNB-CU experiences a segmentation fault when processing an unsolicited 'UE Context Modification Response' message after the corresponding UE context has been released. This message also contains mutated and incorrect identifiers (DU ID, RNTI). While the attacker's action of sending an unsolicited and malformed message is a spec non-conformance, the gNB-CU's subsequent crash indicates a critical flaw in its error handling and input validation logic. Robust implementations should gracefully handle unexpected or invalid messages, for example, by logging an error and discarding the message, rather than suffering a segmentation fault due to potential null pointer dereferences or out-of-bounds access when attempting to look up a non-existent context. The 'Abnormal Conditions' section of the F1AP specification would typically cover such scenarios, requiring the receiving entity to handle them without crashing, as seen in the code snippet 'CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE' (openair2/F1AP/f1ap_cu_ue_context_management.c:79-90) which likely lacks sufficient checks."
+    "rationale": "The gNB-CU experiences a segmentation fault because it fails to robustly handle an out-of-order 'UE Context Modification Response' for a UE context that has already been released. The 'mutated DU ID' in the response exacerbates the issue, leading to an invalid memory access during UE context lookup. This indicates a critical flaw in the gNB-CU's state management, transaction cleanup, and error handling logic, particularly concerning the synchronization between UE context lifecycle events (modification, release) and the processing of asynchronous F1AP messages. While attacker actions trigger the bug, the underlying vulnerability lies in the gNB-CU's inability to maintain consistent state and gracefully reject or ignore messages pertaining to non-existent or stale contexts, which is an implementation-specific failure to adhere to robust design principles, likely falling under 'Abnormal Conditions' in the F1AP specification."
   },
   "step7": {
     "evidence_pack": {
       "spec_citations": [
-        "UE Context Modification (gNB-CU initiated)",
-        "UE CONTEXT MODIFICATION RESPONSE",
-        "gNB-DU UE F1AP ID",
-        "C-RNTI"
+        "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
+        "\u00a78.3.4.2 Successful Operation",
+        "\u00a78.3.4.3 Unsuccessful Operation",
+        "\u00a78.3.4.4 Abnormal Conditions",
+        "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
+        "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE"
       ],
       "code_citations": [
-        "openair2/F1AP/f1ap_cu_ue_context_management.c:79-90",
-        "openair2/RRC/NR/rrc_gNB_UE_context.c:49-54",
-        "openair2/F1AP/f1ap_ids.c:70-75",
-        "openair2/RRC/NR/rrc_gNB_UE_context.c:100-115",
-        "openair2/F1AP/f1ap_ids.c:81-86",
-        "openair2/COMMON/f1ap_messages_types.h:409-417",
-        "openair2/RRC/NR/rrc_gNB_UE_context.h:31-31"
+        "openair2/F1AP/f1ap_cu_ue_context_management.c",
+        "openair2/F1AP/f1ap_ids.c",
+        "openair2/RRC/NR/rrc_gNB_UE_context.c",
+        "openair2/F1AP/f1ap_handlers.c",
+        "openair2/F1AP/f1ap_ids.h",
+        "openair2/RRC/NR/rrc_gNB_UE_context.h",
+        "openair2/COMMON/f1ap_messages_types.h"
       ],
-      "expected_vs_observed": "The gNB-CU is observed to crash with a segmentation fault upon receiving an unsolicited UE Context Modification Response containing a mutated DU ID and an incorrect RNTI, specifically after the corresponding UE context has already been explicitly released. This deviates from the expected behavior where a UE Context Modification Response should only be processed if a prior request was sent by the gNB-CU and if a valid, active UE context exists for the provided identifiers. The system should gracefully handle messages pertaining to released contexts or with invalid identifiers, rather than crashing."
+      "expected_vs_observed": "The observed behavior is a gNB-CU segmentation fault when processing a UE Context Modification Response containing a mutated DU ID, which arrives after the corresponding UE context has already been released. This contrasts with the expected behavior, where the F1AP specification implies that UE Context Modification Responses should only be processed for active UE contexts with valid identifiers. Upon UE context release, any pending modification procedures should be properly terminated, and late or invalid responses, particularly those with mutated IDs, should be gracefully discarded without causing a system crash, adhering to robust error handling for unsuccessful operations or abnormal conditions rather than leading to a segmentation fault."
     }
   },
   "step8": {
     "report": {
       "verdict": "implementation-bug",
-      "rationale": "The gNB-CU experiences a segmentation fault when processing an unsolicited UE Context Modification Response after the corresponding UE context has been released. The system fails to validate that a prior request was sent and that the provided identifiers (mutated DU ID, incorrect RNTI) map to an active UE context. This indicates a lack of robust error handling for out-of-sequence or invalid messages, leading to a crash instead of graceful rejection.",
+      "rationale": "The gNB-CU experiences a segmentation fault when processing a UE Context Modification Response with a mutated DU ID, arriving after the corresponding UE context has been released. This indicates a critical flaw in the gNB-CU's F1AP message handling and state management. The CU fails to properly terminate or cancel pending UE Context Modification transactions upon UE context release, leading to the processing of a stale response for a non-existent context. The mutated DU ID likely causes an invalid memory access during context lookup or processing, resulting in the crash instead of graceful error handling as expected for abnormal conditions.",
       "citations": {
         "spec": [
-          "UE Context Modification (gNB-CU initiated)",
-          "UE CONTEXT MODIFICATION RESPONSE",
-          "gNB-DU UE F1AP ID",
-          "C-RNTI"
+          "\u00a78.3.4 UE Context Modification (gNB-CU initiated)",
+          "\u00a78.3.4.2 Successful Operation",
+          "\u00a78.3.4.3 Unsuccessful Operation",
+          "\u00a78.3.4.4 Abnormal Conditions",
+          "\u00a79.2.2.7 UE CONTEXT MODIFICATION REQUEST",
+          "\u00a79.2.2.8 UE CONTEXT MODIFICATION RESPONSE"
         ],
         "code": [
-          "openair2/F1AP/f1ap_cu_ue_context_management.c:79-90",
-          "openair2/RRC/NR/rrc_gNB_UE_context.c:49-54",
-          "openair2/F1AP/f1ap_ids.c:70-75",
-          "openair2/RRC/NR/rrc_gNB_UE_context.c:100-115",
-          "openair2/F1AP/f1ap_ids.c:81-86",
-          "openair2/COMMON/f1ap_messages_types.h:409-417",
-          "openair2/RRC/NR/rrc_gNB_UE_context.h:31-31"
+          "openair2/F1AP/f1ap_cu_ue_context_management.c",
+          "openair2/F1AP/f1ap_ids.c",
+          "openair2/RRC/NR/rrc_gNB_UE_context.c",
+          "openair2/F1AP/f1ap_handlers.c",
+          "openair2/F1AP/f1ap_ids.h",
+          "openair2/RRC/NR/rrc_gNB_UE_context.h",
+          "openair2/COMMON/f1ap_messages_types.h"
         ]
       },
       "suggested_repro": [
-        "1. Establish a UE context between gNB-CU, gNB-DU, and UE.",
-        "2. Initiate a UE release procedure, ensuring the gNB-CU removes the UE context.",
-        "3. Craft a UE Context Modification Response message with a mutated gNB-DU UE F1AP ID and an incorrect C-RNTI.",
-        "4. Ensure no corresponding UE Context Modification Request was sent by the gNB-CU.",
-        "5. Send this crafted UE Context Modification Response from an attacker (spoofing gNB-DU) to the gNB-CU.",
-        "6. Observe the gNB-CU experiencing a segmentation fault."
+        "1. Establish a UE context between gNB-CU and gNB-DU.",
+        "2. gNB-CU initiates a UE Context Modification Request with an intentionally incorrect RNTI.",
+        "3. Trigger a UE Context Release Procedure for the same UE, ensuring the context is released on the gNB-CU.",
+        "4. An attacker sends a DLRRCMessage Transfer to the gNB-DU.",
+        "5. The gNB-DU sends a UE Context Modification Response to the gNB-CU, containing a mutated DU ID.",
+        "6. Observe gNB-CU segmentation fault upon receiving this late, invalid response."
       ],
       "risks": [
-        "Denial of Service (DoS): An attacker can repeatedly crash the gNB-CU, disrupting service for all UEs managed by it.",
-        "Network Instability: Frequent crashes can lead to an unstable network environment, impacting reliability and performance."
+        "Denial of Service (DoS): An attacker can trigger a gNB-CU crash, leading to service disruption for all UEs managed by that CU.",
+        "System Instability: Repeated crashes can lead to an unstable network environment.",
+        "Security Vulnerability: The ability to crash a core network component via a malformed or out-of-sequence message indicates a significant security flaw."
       ],
       "next_steps": [
-        "Implement robust validation checks in the gNB-CU for incoming F1AP messages, specifically UE Context Modification Response, to verify if a corresponding request was pending and if the provided identifiers map to an active UE context.",
-        "Gracefully discard or log unsolicited messages or messages pertaining to released contexts instead of crashing.",
-        "Develop unit and integration tests to cover scenarios involving unsolicited and invalid F1AP messages, especially after context release.",
-        "Conduct a code review of F1AP message handling and context management to identify similar vulnerabilities."
+        "1. Perform a detailed root cause analysis to pinpoint the exact memory access violation leading to the segmentation fault.",
+        "2. Implement robust state management to ensure pending F1AP transactions are properly terminated or cancelled upon UE context release.",
+        "3. Enhance input validation for incoming F1AP messages, specifically checking for valid DU IDs and active UE contexts before processing responses.",
+        "4. Review and improve timer management for F1AP procedures to correctly handle expiration and discard stale responses.",
+        "5. Implement graceful error handling for unexpected or invalid F1AP messages to prevent system crashes.",
+        "6. Conduct a security audit of F1AP message processing to identify and mitigate similar vulnerabilities."
       ]
     }
   }
