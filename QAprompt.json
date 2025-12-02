@@ -18,7 +18,7 @@
     },
     "VerdictEnum": {
       "type": "string",
-      "enum": ["spec-nonconformance", "implementation-bug", "ambiguous", "needs-more-data"]
+      "enum": ["spec-design-issue", "implementation-bug", "ambiguous", "needs-more-data"]
     },
     "ComponentEnum": {
       "type": "string",
@@ -246,7 +246,7 @@
           "snippets": { "$ref": "#/steps/3/output_schema/properties/snippets" }
         }
       },
-      "llm_prompt_template": "You are ConformanceChecker. Using SNIPPETS as authority, test invariants: directionality, req/resp pairing, ID binding (e.g., CU/DU UE F1AP ID), transaction scoping, no-pending-request on new request, timer preconditions. For each invariant: PASS/FAIL with cite. Propose preliminary verdict per output_schema. Note, all the contents in the output_schema should comply with the uploaded specs or codes ",
+      "llm_prompt_template": "You are ConformanceChecker. Using SNIPPETS as authority, test invariants: directionality, req/resp pairing, ID binding (e.g., CU/DU UE F1AP ID), transaction scoping, no-pending-request on new request, timer preconditions. For each invariant: PASS/FAIL with cite. Propose preliminary verdict per output_schema. Note, all the contents in the output_schema should comply with the uploaded specs or codes. Here, we define the concepts of the verdicts: 1) spec-design-issue: the specifications have design problems or vulnerabilities so the bug happens; 2) implmentation-bug: the specification is right and complete, but the implmentation goes wrong; 3) ambiguous: cannot pinpoint the root cause of the bug just from specs and codes; 4) needs-more-data: you still need more other specs or codes to pinpoint the root cause.",
       "output_schema": {
         "type": "object",
         "required": ["invariant_checks", "preliminary_verdict", "rationale"],
@@ -255,7 +255,7 @@
             "type": "array",
             "items": { "type": "object", "required": ["name", "result", "evidence"], "properties": { "name": { "type": "string" }, "result": { "type": "string", "enum": ["PASS", "FAIL", "UNKNOWN"] }, "evidence": { "type": "array", "items": { "type": "string" } } } }
           },
-          "preliminary_verdict": { "type": "string", "enum": ["spec-nonconformance", "implementation-bug", "ambiguous", "needs-more-data"] },
+          "preliminary_verdict": { "type": "string", "enum": ["spec-design-issue", "implementation-bug", "ambiguous", "needs-more-data"] },
           "rationale": { "type": "string" }
         }
       }
@@ -303,7 +303,7 @@
           "evidence_pack": { "$ref": "#/steps/6/output_schema/properties/evidence_pack" }
         }
       },
-      "llm_prompt_template": "You are ReportWriter. Produce the final JSON report with {verdict, rationale, citations, suggested_repro, risks, next_steps}. Be concise and actionable. Note, all the contents in the output_schema should comply with the uploaded specs or codes",
+      "llm_prompt_template": "You are ReportWriter. Produce the final JSON report with {verdict, rationale, citations, suggested_repro, risks, next_steps}. Be concise and actionable. Note, all the contents in the output_schema should comply with the uploaded specs or codes. Here, we define the concepts of the verdicts: 1) spec-design-issue: the specifications have design problems or vulnerabilities so the bug happens; 2) implmentation-bug: the specification is right and complete, but the implmentation goes wrong; 3) ambiguous: cannot pinpoint the root cause of the bug just from specs and codes; 4) needs-more-data: you still need more other specs or codes to pinpoint the root cause.",
       "output_schema": {
         "type": "object",
         "required": ["report"],
