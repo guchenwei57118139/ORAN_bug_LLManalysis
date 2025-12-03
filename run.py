@@ -274,7 +274,7 @@ def build_inputs_for_step(spec, ctx, step_idx, externals):
 
 def run_pipeline(spec_path: str, model: str, client, externals: dict, temperature=0.1):
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
-    # client = genai.Client(api_key="AIzaSyBaqSqxBCfSsomsMGKLNISFvJU_h1Mwom0")
+    # client = genai.Client(api_key="")
     #client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     ctx = {}
     global_defs = build_global_defs(spec)
